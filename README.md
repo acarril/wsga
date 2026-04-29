@@ -1,30 +1,75 @@
 # rddsga
-Subgroup analysis for regression discontinuity designs using inverse propensity score weighting
 
-# Installation
+**Weighted Subgroup Analysis in Regression Discontinuity Designs**
 
-The package can be installed directly from SSC:
+Implements inverse probability weighted (IPW) subgroup analysis for regression discontinuity (RD) designs. When subgroups differ in observed moderators near the cutoff, a naive comparison of subgroup-specific RD estimates conflates the causal effect of the subgroup characteristic with the effect of correlated moderators. Reweighting observations via IPW balances observed moderators across subgroups at the cutoff, isolating the subgroup-attributable component of the treatment effect difference.
+
+Both a **Stata** package and an **R** package are included in this repository.
+
+---
+
+## Stata
+
+### Installation
+
+From SSC:
 ```stata
 ssc install rddsga
 ```
 
-Alternatively, you can get the latest version hosted in this repository by first setting the location with `net`:
+Latest version from this repository:
 ```stata
-net from https://raw.githubusercontent.com/acarril/rddsga/master/
-```
-Then you can use the following commands to describe and install the package and its ancillary files:
-```stata
-// Describe
-net describe rddsga
-// Install ado-files and help files
+net from https://raw.githubusercontent.com/acarril/rddsga/main/stata/
 net install rddsga
-// Install ancillary files (datasets)
 net get rddsga
 ```
 
-If you have installed the program and want to update it, be sure to `net install` and `net get` using options `replace force`.
+### Quick start
 
-# Help
+```stata
+use rddsga_synth
+rddsga Y Z X1 X2, sgroup(G) bwidth(10) reducedform bsreps(200)
+```
 
-Refer to the included help file for details regarding usage.
-For additional details regarding the methodology refer to the [project wiki](https://gitlab.com/acarril/rddsga/wikis/home).
+See `help rddsga` for full documentation.
+
+---
+
+## R
+
+### Installation
+
+```r
+devtools::install_github("acarril/rddsga")
+```
+
+### Quick start
+
+```r
+library(rddsga)
+data(rddsga_synth)
+
+# Sharp RD with IPW balancing moderator m, bootstrap SEs
+fit <- rddsga(
+  y ~ m | sgroup,
+  data    = rddsga_synth,
+  running = ~ x,
+  bwidth  = 0.5,
+  bsreps  = 200,
+  seed    = 42
+)
+print(fit)
+summary(fit)   # also shows balance tables
+```
+
+See `?rddsga` and `vignette("rddsga-intro")` for full documentation.
+
+---
+
+## Reference
+
+Carril, Alvaro, Andre Cazor, Maria Paula Gerardino, Stephan Litschig, and Dina Pomeranz. "Weighted Subgroup Analysis in Regression Discontinuity Designs." Working paper.
+
+## Issues
+
+Please report bugs at <https://github.com/acarril/rddsga/issues>.

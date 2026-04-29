@@ -1,0 +1,135 @@
+---
+title: "Introduction to rddsga"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to rddsga}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+## Overview
+
+`rddsga` implements weighted subgroup analysis for regression discontinuity (RD) designs. The key idea is that when subgroups differ in observed characteristics near the RD cutoff, a raw comparison of subgroup-specific RD estimates conflates the causal effect of the subgroup with the effect of correlated moderators. Inverse probability weighting (IPW) rebalances observed moderators across subgroups, isolating the subgroup-attributable component of the treatment effect difference.
+
+## Installation
+
+```r
+# Install from GitHub
+devtools::install_github("acarril/rddsga")
+```
+
+## Synthetic example
+
+We use the bundled `rddsga_synth` dataset. The running variable `x` is centered
+at zero; the cutoff is at 0. The binary subgroup indicator is `sgroup`. The
+continuous moderator `m` has different means across subgroups near the cutoff.
+True per-subgroup RD effects are 2 (G=0) and 4 (G=1).
+
+```{r load}
+library(rddsga)
+data(rddsga_synth)
+str(rddsga_synth)
+```
+
+### Step 1: Unweighted subgroup analysis
+
+```{r noipsw, cache = TRUE}
+fit_unw <- rddsga(
+  y ~ 1 | sgroup,          # outcome ~ covariates | subgroup
+  data      = rddsga_synth,
+  running   = ~ x,
+  bwidth    = 0.5,
+  noipsw    = TRUE,         # no IPW — just separate local linear regressions
+  bootstrap = FALSE
+)
+print(fit_unw)
+```
+
+### Step 2: IPW-weighted subgroup analysis
+
+Include the moderator `m` so the propensity score model can balance it.
+
+```{r ipsw, cache = TRUE}
+fit_ipsw <- rddsga(
+  y ~ m | sgroup,
+  data      = rddsga_synth,
+  running   = ~ x,
+  bwidth    = 0.5,
+  bootstrap = FALSE
+)
+summary(fit_ipsw)
+```
+
+The balance table shows that IPW eliminates the standardized difference in `m`
+across subgroups at the cutoff.
+
+### Step 3: Adding bootstrap inference
+
+```{r bootstrap, cache = TRUE}
+fit_boot <- rddsga(
+  y ~ m | sgroup,
+  data      = rddsga_synth,
+  running   = ~ x,
+  bwidth    = 0.5,
+  bsreps    = 200,
+  seed      = 42
+)
+print(fit_boot)
+```
+
+### Step 4: Fuzzy RD via 2SLS
+
+The dataset includes a fuzzy treatment `D` with ~80% compliance above the
+cutoff. Use `model = "iv"` to obtain 2SLS estimates.
+
+```{r fuzzy, cache = TRUE}
+fit_iv <- rddsga(
+  y ~ m | sgroup,
+  data      = rddsga_synth,
+  running   = ~ x,
+  bwidth    = 0.5,
+  model     = "iv",
+  fuzzy     = ~ D,
+  bootstrap = FALSE
+)
+print(fit_iv)
+```
+
+## Accessing results
+
+All estimates, standard errors, and confidence intervals are stored in the
+returned object:
+
+```{r access}
+# Point estimates
+coef(fit_boot)
+
+# Variance-covariance matrix for (G=0, G=1)
+vcov(fit_boot)
+
+# 95% confidence intervals
+confint(fit_boot)
+
+# Number of observations within bandwidth
+nobs(fit_boot)
+
+# Bootstrap draws (B × 2 matrix)
+head(fit_boot$bootstrap$draws)
+```
+
+## Key options
+
+| Argument | Description |
+|---|---|
+| `kernel` | `"uniform"` (default), `"triangular"`, `"epanechnikov"` |
+| `p` | Polynomial order (default `1`; `2` for local quadratic) |
+| `m` | IPW mode: `2` = balance both groups (default), `1` = ATT G=1, `0` = ATT G=0 |
+| `comsup` | Restrict to common propensity score support |
+| `rbalance` | Balance table means: `0` = at cutoff (default), `1` = in sample |
+| `block_var` | Column name for stratified block bootstrap |
+| `vce` | Sandwich SE type: `"HC1"` (default), `"HC0"`, `"HC2"`, `"HC3"`, `"cluster"` |
+| `ps_model` | `"logit"` (default) or `"probit"` for propensity score |

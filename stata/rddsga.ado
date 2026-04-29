@@ -1,12 +1,12 @@
 *! 1.0.3 Andre Cazor 03012018
 program define rddsga, eclass
 version 11.1
-syntax varlist(min=2 numeric fv) [if] [in] , ///
+syntax varlist(min=2 numeric fv) [if] [in], ///
   SGroup(name) BWidth(real) [ fuzzy(name) Cutoff(real 0) Kernel(string) /// important inputs
   	IPSWeight(name) PSCore(name) comsup /// newvars
     BALance(varlist numeric) DIBALance probit /// balancepscore opts
-    IVregress REDUCEDform FIRSTstage vce(string) p(int 1) /// model opts
-    noBOOTstrap bsreps(real 50) FIXEDbootstrap BLOCKbootstrap(string) NORMal  noipsw weights(string) ] // bootstrap options
+    IVregress REDUCEDform FIRSTstage vce(string) p(int 1) m(int 2) rbalance(int 0) /// model opts
+    noBOOTstrap bsreps(real 50) FIXEDbootstrap BLOCKbootstrap(string) NORMal noipsw weights(string) ] // bootstrap options
 
 *-------------------------------------------------------------------------------
 * Check inputs
@@ -15,7 +15,7 @@ syntax varlist(min=2 numeric fv) [if] [in] , ///
 // Check that depvar and assignvar are not factor variables
 local fvops = "`s(fvops)'" == "true" | _caller() >= 11 
 if `fvops' { 
-  local vv: di "version " ///
+  local vv: di "version " ///me
   string(max(11,_caller())) ", missing: " 
   gettoken first rest : varlist
   gettoken second rest : rest
@@ -58,7 +58,6 @@ g `NOCOMSUP'=1
 // pscore(): define new propensity score variable or use a tempvar
 if "`pscore'" != "" confirm new variable `pscore'
 else tempvar pscore
-
 
 
 // Issue warning if no covariates and no vars in balance when propensity score weighting is used:
@@ -105,6 +104,14 @@ local assignvar :	word 2 of `varlist'
 local covariates : list varlist - depvar
 local covariates : list covariates - assignvar
 
+// Add c. stub to continuous covariates in balance for factor interactions
+foreach var in `balance' {
+  capture _fv_check_depvar `var'
+  if _rc != 0 local fv_balance `fv_balance' `var'
+  else local fv_balance `fv_balance' c.`var'
+}
+
+
 // Add c. stub to continuous covariates for factor interactions
 foreach var in `covariates' {
   capture _fv_check_depvar `var'
@@ -129,7 +136,29 @@ else local binarymodel logit
 
 // Create bandwidth condition 
 local bwidthtab `bwidth'
-local bwidth abs(`assignvar'-`cutoff') < `bwidth'
+local bwidth abs(`assignvar') < `bwidth'
+
+
+// Create condition whether only group 1 or group 2 is weighted or both groups are weighted. 
+
+if `m'==2 /* both groups weighted*/ {
+local mc=`m'
+}
+if `m'==1 /*only group 1*/ {
+local mc=`m'
+}
+if `m'==0 /*only group 0*/ {
+local mc=`m'
+}
+
+if `rbalance'==1 {
+local rbalance=1 // mean in sample
+}
+if `rbalance'==0 {
+local rbalance=0 // mean in cutoff
+}
+
+
 
 // Create indicator cutoff variable
 *tempvar cutoffvar
@@ -190,6 +219,7 @@ scalar unw_N_G0 = `N_G0'
 
 }
 
+
 *-------------------------------------------------------------------------------
 * Compute balance table matrices
 *-------------------------------------------------------------------------------
@@ -201,8 +231,8 @@ if `: list sizeof balance'!=0 {
 
 // Compute balanace matrix 
 balancematrix, matname(unw)  ///
- weights(`oweights') touse(`touse') bwidth(`bwidth') balance(`balance') ///
-  sgroup(`sgroup') sgroup0(`sgroup0') n_balance(`n_balance')
+ weights(`oweights') assignvar(`assignvar') touse(`touse') bwidth(`bwidth') balance(`balance') m(`m') ///
+  sgroup(`sgroup') sgroup0(`sgroup0') n_balance(`n_balance') rbalance(`rbalance')
   
 
 // Store balance matrix and computed balance stats
@@ -222,6 +252,7 @@ if "`dibalance'" != "" {
   di "Global p-value: " unw_pval_global
 }
 
+
 if "`ipsw'" != "noipsw" {
 
 * Propensity Score Weighting balance
@@ -229,9 +260,9 @@ if "`ipsw'" != "noipsw" {
 // Compute balanace matrix 
 
 balancematrix, matname(ipsw)  ///
-  psw ipsweight(`ipsweight') weights(`oweights') touse(`touse') bwidth(`bwidth') balance(`balance') ///
+  psw ipsweight(`ipsweight') weights(`oweights') touse(`touse') assignvar(`assignvar') bwidth(`bwidth') balance(`balance') m(`m') ///
   pscore(`pscore') comsup nocomsup(`NOCOMSUP') binarymodel(`binarymodel') ///
-	sgroup(`sgroup') sgroup0(`sgroup0') n_balance(`n_balance') 
+	sgroup(`sgroup') sgroup0(`sgroup0') n_balance(`n_balance')  rbalance(`rbalance') 
 	
 // Store balance matrix and computed balance stats
 matrix ipsw = e(ipsw)
@@ -301,9 +332,22 @@ ereturn local blockbootstrap `blockbootstrap'
 if "`reducedform'" != "" {
   // Regression
     mat IndIV=[0]
-    qui reg `depvar' i.`sgroup'#1._cutoff i.`sgroup' ///
+	
+	** this is only used to report R2 with covariates in balance	
+	qui reg `depvar' i.`sgroup'#1._cutoff i.`sgroup' ///
+    i.`sgroup'#(`fv_balance' c.`assignvar' c.`assignvar'#_cutoff) `polynm' ///
+    `weight' if `touse' & `bwidth', vce(`vce')
+
+	local r2_covbal= e(r2)
+	local r2_acovbal= e(r2_a)
+
+    ** Main Regression
+	qui reg `depvar' i.`sgroup'#1._cutoff i.`sgroup' ///
     i.`sgroup'#(`fv_covariates' c.`assignvar' c.`assignvar'#_cutoff) `polynm' ///
     `weight' if `touse' & `bwidth', vce(`vce')
+	
+	ereturn scalar r2_covbal=`r2_covbal'
+	ereturn scalar r2_acovbal=`r2_acovbal'
   
   ** Escalar used as a indicator to compute bootstrap. 
     mat fixed=[0]
@@ -743,9 +787,9 @@ end
 *-------------------------------------------------------------------------------
 program define balancematrix, eclass
 syntax, matname(string) /// important inputs, differ by call
-  touse(name) weights(string) bwidth(string) balance(varlist) /// unchanging inputs
-  [psw ipsweight(name) pscore(name) comsup nocomsup(name) binarymodel(string)] /// only needed for PSW balance
-  sgroup(name) sgroup0(name) n_balance(int) // todo: eliminate these? can be computed by subroutine at low cost
+  touse(name)  weights(string) bwidth(string) balance(varlist) m(int) /// unchanging inputs
+  [psw ipsweight(name)  pscore(name) comsup nocomsup(name) binarymodel(string)] /// only needed for PSW balance
+  sgroup(name) sgroup0(name) n_balance(int) rbalance(int) assignvar(name) // todo: eliminate these? can be computed by subroutine at low cost
 
 
 * Create variables specific to PSW matrix
@@ -764,6 +808,7 @@ if "`psw'" != "" { // if psw
 if "`nocomsup'" != "" {
   tempvar COMSUP
   qui gen `COMSUP' = 1 if `touse' & `bwidth' & !mi(`sgroup')
+  qui gen comsup=`COMSUP'
 }  
 else {
 qui sum `pscore' if `sgroup' == 1 /* todo: check why this is like that */
@@ -779,18 +824,52 @@ tempvar COMSUP
    label var comsup "Dummy for obs. in common support"
 }
   // Count observations in each fuzzy group
+  
+	if `m'==2 {
   qui count if `touse' & `bwidth' & `COMSUP' & `sgroup'==0 & !mi(`pscore')
   local N_G0 = `r(N)'
   qui count if `touse' & `bwidth' & `COMSUP' & `sgroup'==1 & !mi(`pscore')
   local N_G1 = `r(N)'
-
-
+	}
+	if `m'==1 {
+  qui count if `touse' & `bwidth' & `COMSUP' & `sgroup'==0
+  local N_G0 = `r(N)'
+  qui count if `touse' & `bwidth' & `COMSUP' & `sgroup'==1 & !mi(`pscore')
+  local N_G1 = `r(N)'
+	}	
+	if `m'==0 {
+  qui count if `touse' & `bwidth' & `COMSUP' & `sgroup'==0 & !mi(`pscore')
+  local N_G0 = `r(N)'
+  qui count if `touse' & `bwidth' & `COMSUP' & `sgroup'==1 
+  local N_G1 = `r(N)'
+	}	
+  	
+ 
+  
   // Compute propensity score weighting vector
   cap drop `ipsweight'
+	if `m'==2 {
   qui gen `ipsweight' = ///
    ( `N_G1'/(`N_G1'+`N_G0')/`pscore'*(`sgroup'==1) + ///
     `N_G0'/(`N_G1'+`N_G0')/(1-`pscore')*(`sgroup'==0)) ///
     if `touse' & `bwidth' & `COMSUP' & !mi(`sgroup')
+	}
+	if `m'==1 {
+  qui gen `ipsweight' = ///
+   (1-`pscore')/`pscore' ///
+    if `touse' & `bwidth' & `COMSUP' & `sgroup'==1 	
+	qui replace `ipsweight'=1 ///
+	if `touse' & `bwidth' & `sgroup'==0 	
+	}
+if `m'==0 {
+  qui gen `ipsweight' = ///
+   `pscore'/(1-`pscore') ///
+    if `touse' & `bwidth' & `COMSUP' & `sgroup'==0
+	qui replace `ipsweight'=1 ///
+	if `touse' & `bwidth' & `sgroup'==1 
+
+	}
+	
 
 	tempvar nweights
 	qui gen `nweights'=`ipsweight'*`weights'	
@@ -812,10 +891,10 @@ else { // if nopsw
 local j = 0
 foreach var of varlist `balance' {
   local ++j
-
   // Compute and store conditional expectations
-  if "`psw'" == "" qui reg `var' `sgroup0' `sgroup' [iw=`weights'] if `touse' & `bwidth', noconstant /* */
-  else qui reg `var' `sgroup0' `sgroup' [iw=`nweights'] if `touse' & `bwidth' & `COMSUP', noconstant
+  if `rbalance'==1 {
+  if "`psw'" == ""   qui reg `var' `sgroup0' `sgroup' [iw=`weights'] if `touse' & `bwidth', noconstant /* */
+  else  qui reg `var' `sgroup0' `sgroup' [iw=`nweights'] if `touse' & `bwidth' & `COMSUP', noconstant
   local coef`j'_G0 = _b[`sgroup0']
   local coef`j'_G1 = _b[`sgroup']
   
@@ -830,13 +909,59 @@ foreach var of varlist `balance' {
   if "`psw'" == "" qui summ `var' if `touse' & `bwidth' & !mi(`sgroup')
   else qui summ `var' if `touse' & `bwidth' & `COMSUP' & !mi(`sgroup')
   local stddiff`j' = (diff`j')/r(sd)
+  }
+  
+    if `rbalance'==0 {
+ 
+  
+  // Compute and store mean differences and their p-values
+ if "`psw'" == ""  { 
+    qui reg `var' `assignvar' [iw=`weights'] if `touse' & `bwidth' & `sgroup0'
+	qui estimates store model1
+    local coef`j'_G0 = _b[_cons]
+	local se`j'_G0 =_se[_cons]
+	qui reg `var' `assignvar'  [iw=`weights'] if `touse' & `bwidth' &  `sgroup'  
+	qui estimates store model2
+	  local coef`j'_G1 =  _b[_cons]
+	local se`j'_G1 =_se[_cons]
+	
+	qui reg `var' c.`assignvar'##`sgroup0'   [iw=`weights'] if `touse' & `bwidth'  
+matrix m=r(table)
+
+  scalar diff`j'=m[1,3] // mean difference
+ 
+  local pval`j' = m[4,3] // p-value 
+  }
+  else  { 
+    qui reg `var' `assignvar' [iw=`nweights'] if `touse' & `bwidth' & `sgroup0'
+	qui estimates store model1
+    local coef`j'_G0 = _b[_cons]
+
+	qui reg `var' `assignvar'  [iw=`nweights'] if `touse' & `bwidth' &  `sgroup'  
+	qui estimates store model2
+	  local coef`j'_G1 =  _b[_cons]
+  	qui reg `var' c.`assignvar'##`sgroup0'   [iw=`nweights'] if `touse' & `bwidth'  
+matrix m=r(table)
+
+  scalar diff`j'=m[1,3] // mean difference
+ 
+  local pval`j' = m[4,3] // p-value 
+  }
+
+  // Standardized mean difference
+  if "`psw'" == "" qui summ `var' if `touse' & `bwidth' & !mi(`sgroup')
+  else qui summ `var' if `touse' & `bwidth' & `COMSUP' & !mi(`sgroup')
+  local stddiff`j' = (diff`j')/r(sd)
+  }
 }
+
 
 
 * Compute global stats
 *-------------------------------------------------------------------------------
 // Mean of absolute standardized mean differences (ie. stddiff + ... + stddiff`k')
 /* todo: this begs to be vectorized */
+
 local avgdiff = 0
 forvalues j = 1/`n_balance' {
   local avgdiff = abs(`stddiff`j'') + `avgdiff' // sum over `j' (balance)
@@ -844,10 +969,42 @@ forvalues j = 1/`n_balance' {
 local avgdiff = `avgdiff'/`n_balance' // compute mean 
 
 // F-statistic and global p-value
+if  `rbalance'==1 {
 if "`psw'" == "" qui reg `sgroup' `balance' [iw=`weights']  if `touse' & `bwidth'
 else qui reg `sgroup' `balance' [iw=`nweights'] if `touse' & `bwidth' & `COMSUP' 
 local Fstat = e(F)
 local pval_global = 1-F(e(df_m),e(df_r),e(F))
+}
+
+
+if  `rbalance'==0 {
+local j = 0 
+foreach var of varlist `balance' {
+local j=`j'+1
+qui gen aux`j'=`var' *`assignvar'
+}
+
+if "`psw'" == "" {
+
+  qui reg `sgroup' aux* `assignvar' [iw=`weights']  if `touse' & `bwidth', noconstant
+  predict res_aux, res
+  qui reg res_aux `balance' [iw=`weights']  if `touse' & `bwidth' 
+  cap drop res_aux
+ }
+else  { 
+  qui reg `sgroup' aux* `assignvar'  [iw=`nweights']  if `touse' & `bwidth', noconstant
+  predict res_aux, res
+   qui reg res_aux `balance' [iw=`nweights']  if `touse' & `bwidth' 
+     cap drop res_aux
+  }
+local Fstat = e(F)
+local pval_global = 1-F(e(df_m),e(df_r),e(F))
+cap drop aux*
+}
+
+
+
+
 
 * Create balance matrix
 *-------------------------------------------------------------------------------
@@ -879,7 +1036,6 @@ ereturn scalar `matname'_Fstat = `Fstat'
 ereturn scalar `matname'_pvalue = `pval_global'
 ereturn scalar `matname'_N_G1 = `N_G1'
 ereturn scalar `matname'_N_G0 = `N_G0'
-
 
 
 
