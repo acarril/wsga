@@ -1,4 +1,4 @@
-*! 1.0.3 Andre Cazor 03012018
+*! 1.1.0 Alvaro Carril 2026-04-30
 program define rddsga, eclass
 version 11.1
 syntax varlist(min=2 numeric fv) [if] [in], ///
@@ -305,6 +305,15 @@ local weight "[pw=`kernelipsw']"
 
 
 
+// Build psw options for myboo bootstrap calls
+local psw_boot_opts
+if "`ipsw'" != "noipsw" & `: list sizeof balance' > 0 {
+  local psw_boot_opts psw ipsweight(`ipsweight') kernelipsw(`kernelipsw') ///
+    kwt(`kwt') touse(`touse') bwidth(`bwidth') balance(`balance') ///
+    oweights(`oweights') m(`m') binarymodel(`binarymodel') pscore(`pscore')
+  if "`comsup'" != "" local psw_boot_opts `psw_boot_opts' comsup
+}
+
 * First stage
 *-------------------------------------------------------------------------------
 if "`firststage'" != "" {
@@ -322,7 +331,7 @@ ereturn local blockbootstrap `blockbootstrap'
 }
     
   // Compute bootstrapped variance-covariance matrix and post results
-  if "`bootstrap'" != "nobootstrap" myboo `sgroup' _cutoff `bsreps'
+  if "`bootstrap'" != "nobootstrap" myboo `sgroup' _cutoff `bsreps', `psw_boot_opts'
   // If no bootstrap, trim b and V to show only RD estimates
   else epost `sgroup' _cutoff 
 }
@@ -357,7 +366,7 @@ ereturn local blockbootstrap `blockbootstrap'
 }
 
   // Compute bootstrapped variance-covariance matrix and post results
-  if "`bootstrap'" != "nobootstrap" myboo `sgroup' _cutoff `bsreps'
+  if "`bootstrap'" != "nobootstrap" myboo `sgroup' _cutoff `bsreps', `psw_boot_opts'
   // If no bootstrap, trim b and V to show only RD estimates
   else epost `sgroup' _cutoff 
 }
@@ -410,7 +419,7 @@ ereturn local cmdline `RFline'
     }
 
   // Compute bootstrapped variance-covariance matrix and post results
-  if "`bootstrap'" != "nobootstrap" myboo `sgroup' `fuzzy' `bsreps'  
+  if "`bootstrap'" != "nobootstrap" myboo `sgroup' `fuzzy' `bsreps', `psw_boot_opts'
 
   // If no bootstrap, trim b and V to show only RD estimates
   else epost `sgroup' `fuzzy'
@@ -490,16 +499,19 @@ if "`ivregress'" != "" | "`reducedform'" != "" | "`firststage'" != "" {
     // Standard error
     matrix e_V = e(V)
     scalar se_g`g' = sqrt(e_V[`=`g'+1',`=`g'+1'])
-    // t-stat 
+    // t-stat
     scalar t_g`g' = b_g`g'/se_g`g'
-    // P-value
-    scalar p_g`g' = ttail(df, abs(t_g`g'))*2
-*    scalar p_g`g' = e(p_g`g')
-    // Confidence interval
-    scalar ci_lb_g`g' = b_g`g' + invttail(df, 0.975)*se_g`g'
-    scalar ci_ub_g`g' = b_g`g' + invttail(df, 0.025)*se_g`g'
-*    scalar ci_ub_g`g'_norm = e(ci_ub_g`g')
-*    scalar ci_lb_g`g' = e(ci_lb_g`g')
+    // P-value and confidence interval
+    if "`bootstrap'" != "nobootstrap" {
+      scalar p_g`g'     = e(pval`g')
+      scalar ci_lb_g`g' = e(lb_g`g')
+      scalar ci_ub_g`g' = e(ub_g`g')
+    }
+    else {
+      scalar p_g`g'     = ttail(df, abs(t_g`g'))*2
+      scalar ci_lb_g`g' = b_g`g' + invttail(df, 0.975)*se_g`g'
+      scalar ci_ub_g`g' = b_g`g' + invttail(df, 0.025)*se_g`g'
+    }
   }
 
   * Compute and store difference estimates 
@@ -510,13 +522,19 @@ if "`ivregress'" != "" | "`reducedform'" != "" | "`firststage'" != "" {
   // Standard error
   matrix e_V_diff = r(V)
   scalar se_diff = sqrt(e_V_diff[1,1])
-  // t-stat 
+  // t-stat
   scalar t_diff = b_diff/se_diff
-  // P>|t|
-  scalar p_diff = 2*(1-normal(abs(t_diff))) // norm and boot are the same 
-  // Confidence interval
-  scalar ci_lb_diff = b_diff + invttail(`=r(N)-df', 0.975)*se_diff // fix: not exactly the same as nlcom
-  scalar ci_ub_diff = b_diff + invttail(`=r(N)-df', 0.025)*se_diff // fix: not exactly the same as nlcom
+  // P-value and confidence interval
+  if "`bootstrap'" != "nobootstrap" {
+    scalar p_diff     = e(pval_diff)
+    scalar ci_lb_diff = e(lb_diff)
+    scalar ci_ub_diff = e(ub_diff)
+  }
+  else {
+    scalar p_diff     = 2*(1-normal(abs(t_diff)))
+    scalar ci_lb_diff = b_diff + invttail(df, 0.975)*se_diff
+    scalar ci_ub_diff = b_diff + invttail(df, 0.025)*se_diff
+  }
 
 
   * Display estimation results
@@ -635,11 +653,16 @@ end
 * myboo: compute bootstrapped variance-covariance matrix & adjust ereturn results
 *-------------------------------------------------------------------------------
 program define myboo, eclass
+  syntax anything [, PSW IPSWeight(name) KERNELipsw(name) KWT(name) ///
+    TOuse(name) BWIDTH(string) BALance(varlist) OWeights(name) ///
+    M(integer 2) BINarymodel(string) PSCore(name) COmsup]
+
+  local svar : word 1 of `anything'
+  local cvar : word 2 of `anything'
+  local B    : word 3 of `anything'
 
   // Store results: scalars
   local scalars: e(scalars)
-
-  
   foreach scalar of local scalars {
     local `scalar' = e(`scalar')
   }
@@ -648,89 +671,137 @@ program define myboo, eclass
   foreach macro of local macros {
     local `macro' = e(`macro')
   }
-  
 
-  // Store results: matrices (drop V_modelbased; b and V are computed below)
-  local matrices: e(matrices)
   // Store results: functions
   tempvar esample
   gen `esample' = e(sample)
-  * Extract b submatrix with subgroup coefficients
+  // Extract b submatrix with subgroup coefficients
   matrix b = e(b)
-  matrix b = b[1, "0.`1'#1.`2'".."1.`1'#1.`2'"]
-  matrix colnames b = 0.`1'#1.`2' 1.`1'#1.`2'
- 
-  // Start bootstrap 
-  di "" // empty line on purpose
-  _dots 0, title(Bootstrap replications) reps(`3')
-  cap mat drop cumulative // more elegant solution?
-  forvalues i=1/`3' {
+  matrix b = b[1, "0.`svar'#1.`cvar'".."1.`svar'#1.`cvar'"]
+  matrix colnames b = 0.`svar'#1.`cvar' 1.`svar'#1.`cvar'
+
+  // Start bootstrap
+  di ""
+  _dots 0, title(Bootstrap replications) reps(`B')
+  cap mat drop cumulative
+  tempvar COMSUP_b
+  forvalues i=1/`B' {
     preserve
-    bsample, strata(`e(blockbootstrap)') // sample w/ replacement; default sample size is _N
-    qui `e(cmdline)' // use full regression specification left out by reg
-    tempname this_run
-    ** If RDD is not fuzzy or we do bootstrap both first stage and reduced form 
-    if IndIV[1,1]==0 | fixed[1,1]==0  {
-      mat `this_run' = (_b[0.`1'#1.`2'], _b[1.`1'#1.`2'])
+    bsample, strata(`e(blockbootstrap)')
+
+    // Re-estimate propensity score on bootstrap sample
+    if "`psw'" != "" {
+      // Re-fit binary model and predict new pscore
+      qui drop `pscore'
+      qui `binarymodel' `svar' `balance' [pw=`oweights'] if `touse' & `bwidth'
+      qui predict double `pscore' if `touse' & `bwidth' & !mi(`svar')
+      // Re-evaluate common support
+      cap drop `COMSUP_b'
+      if "`comsup'" != "" {
+        qui sum `pscore' if `svar' == 1 & `touse' & `bwidth'
+        qui gen byte `COMSUP_b' = (`pscore' >= r(min) & `pscore' <= r(max)) ///
+          if `touse' & `bwidth' & !mi(`svar')
+      }
+      else {
+        qui gen byte `COMSUP_b' = 1 if `touse' & `bwidth' & !mi(`svar')
+      }
+      // Recompute N_G0, N_G1 on bootstrap sample
+      if `m' == 2 {
+        qui count if `touse' & `bwidth' & `COMSUP_b' & `svar'==0 & !mi(`pscore')
+        local N_G0_b = r(N)
+        qui count if `touse' & `bwidth' & `COMSUP_b' & `svar'==1 & !mi(`pscore')
+        local N_G1_b = r(N)
+      }
+      else if `m' == 1 {
+        qui count if `touse' & `bwidth' & `COMSUP_b' & `svar'==0
+        local N_G0_b = r(N)
+        qui count if `touse' & `bwidth' & `COMSUP_b' & `svar'==1 & !mi(`pscore')
+        local N_G1_b = r(N)
+      }
+      else {
+        qui count if `touse' & `bwidth' & `COMSUP_b' & `svar'==0 & !mi(`pscore')
+        local N_G0_b = r(N)
+        qui count if `touse' & `bwidth' & `COMSUP_b' & `svar'==1
+        local N_G1_b = r(N)
+      }
+      // Recompute ipsweight: clear first, then set per mode
+      qui replace `ipsweight' = . if `touse' & `bwidth'
+      if `m' == 2 {
+        qui replace `ipsweight' = ///
+          (`N_G1_b'/(`N_G1_b'+`N_G0_b')/`pscore'*(`svar'==1) + ///
+           `N_G0_b'/(`N_G1_b'+`N_G0_b')/(1-`pscore')*(`svar'==0)) ///
+          if `touse' & `bwidth' & `COMSUP_b' & !mi(`svar')
+      }
+      else if `m' == 1 {
+        qui replace `ipsweight' = (1-`pscore')/`pscore' ///
+          if `touse' & `bwidth' & `COMSUP_b' & `svar'==1
+        qui replace `ipsweight' = 1 if `touse' & `bwidth' & `svar'==0
+      }
+      else {
+        qui replace `ipsweight' = `pscore'/(1-`pscore') ///
+          if `touse' & `bwidth' & `COMSUP_b' & `svar'==0
+        qui replace `ipsweight' = 1 if `touse' & `bwidth' & `svar'==1
+      }
+      // Recompute kernelipsw = ipsweight * kwt
+      qui replace `kernelipsw' = `ipsweight' * `kwt'
     }
-    	 
-		
-    ** If RDD is fuzzy and we do only bootstrap in the reduced form keeping the first stage fixed.
-if IndIV[1,1]==1 & fixed[1,1]==1 {  
-    local CoeffIVg0_`i'= _b[0.`1'#1._cutoff]/FS[1,1]
-    local CoeffIVg1_`i'= _b[1.`1'#1._cutoff]/FS[1,2]
-    mat `this_run' = (`CoeffIVg0_`i'',`CoeffIVg1_`i'')
-    }  
-    
+
+    qui `e(cmdline)'
+    tempname this_run
+    // Non-IV or bootstrap-both-stages
+    if IndIV[1,1]==0 | fixed[1,1]==0 {
+      local b_g0_i = _b[0.`svar'#1.`cvar']
+      local b_g1_i = _b[1.`svar'#1.`cvar']
+      mat `this_run' = (`b_g0_i', `b_g1_i', `b_g1_i' - `b_g0_i')
+    }
+    // IV with fixed first stage: bootstrap reduced form, divide by saved FS coefs
+    if IndIV[1,1]==1 & fixed[1,1]==1 {
+      local CoeffIVg0_`i' = _b[0.`svar'#1._cutoff]/FS[1,1]
+      local CoeffIVg1_`i' = _b[1.`svar'#1._cutoff]/FS[1,2]
+      mat `this_run' = (`CoeffIVg0_`i'', `CoeffIVg1_`i'', ///
+        `CoeffIVg1_`i'' - `CoeffIVg0_`i'')
+    }
     mat cumulative = nullmat(cumulative) \ `this_run'
     restore
     _dots `i' 0
   }
-  
- 
-  
+
   di _newline
-  // Compute variance-covariance matrix 
-  /* This procedure was achieved with the variance mata function, but could be 
-  computed with cross() or crossdev() mata functions. */
+  // Compute 2x2 VCV from first two columns (g0, g1)
   cap mat drop V
   mata: cumulative = st_matrix("cumulative")
-  mata: st_matrix("V", variance(cumulative)) // see help mf_mean
-  /*
-  // New computation
-  mata: cumulative = st_matrix("cumulative")
-  mata: st_matrix("means", mean(cumulative))
-  matrix means = means'
-  matrix U = J(1,`3',1)
-  matrix means = means * U 
-  matrix cumulative = cumulative'
-  matrix V = cumulative - means
-  matrix V = V*V'
-  matrix V = V/`=`3'-1'
-  */
-  // Add names to rows and columns of V 
-  mat rownames V = 0.`1'#1.`2' 1.`1'#1.`2'
-  mat colnames V = 0.`1'#1.`2' 1.`1'#1.`2'
-  // Return 
+  mata: st_matrix("V", variance(cumulative[., 1..2]))
+  // Add names to V
+  mat rownames V = 0.`svar'#1.`cvar' 1.`svar'#1.`cvar'
+  mat colnames V = 0.`svar'#1.`cvar' 1.`svar'#1.`cvar'
+  // Return
   ereturn post, esample(`esample')
   // Post results: scalars
   foreach scalar of local scalars {
     ereturn scalar `scalar' = ``scalar''
   }
-  ereturn scalar N_reps = `3'
+  ereturn scalar N_reps = `B'
   ereturn scalar level = 95
-  // Empirical p-values 
+  // Empirical p-values for subgroups
   cap scalar drop bscoef
   forvalues g = 0/1 {
-    local count = 0 // reset count for second subgroup 
-    forvalues i = 1/`3' {
+    local count = 0
+    forvalues i = 1/`B' {
       scalar bscoef = cumulative[`i',`=`g'+1']
       if abs(bscoef) >= abs(b[1,`=`g'+1']) local count = `count'+1
     }
-    scalar pval`g' = (1+`count') / (`3' + 1)
-*    di "pval`g' = (1+`count') / (`3' + 1)"
+    scalar pval`g' = (1+`count') / (`B' + 1)
     ereturn scalar pval`g' = pval`g'
   }
+  // Empirical p-value for diff (column 3)
+  scalar orig_diff = b[1,2] - b[1,1]
+  local count_diff = 0
+  forvalues i = 1/`B' {
+    scalar bscoef = cumulative[`i',3]
+    if abs(bscoef) >= abs(orig_diff) local count_diff = `count_diff' + 1
+  }
+  scalar pval_diff = (1 + `count_diff') / (`B' + 1)
+  ereturn scalar pval_diff = pval_diff
   // Empirical confidence intervals
   svmat cumulative, names(_subgroup)
   forvalues g = 0/1 {
@@ -741,20 +812,21 @@ if IndIV[1,1]==1 & fixed[1,1]==1 {
     scalar ub_g`g' = r(c_2)
     ereturn scalar ub_g`g' = ub_g`g'
   }
-  
+  // Empirical CI for diff (column 3)
+  qui centile _subgroup3, centile(2.5 97.5)
+  drop _subgroup3
+  scalar lb_diff = r(c_1)
+  ereturn scalar lb_diff = lb_diff
+  scalar ub_diff = r(c_2)
+  ereturn scalar ub_diff = ub_diff
   // Post results: macros
   foreach macro of local macros {
-    if "`macro'" == "clustvar" continue // skip this macro as it doesn't apply
+    if "`macro'" == "clustvar" continue
     ereturn local `macro' ``macro''
   }
   ereturn local vcetype "Bootstrap"
   ereturn local vce "bootstrap"
   ereturn local prefix "bootstrap"
-*  ereturn matrix cumulative = cumulative
-  // Drop auxiliary matrices 
-*  cap mat drop cumulative
-*  cap mat drop  means
-*  cap mat drop U 
 end
 
 *-------------------------------------------------------------------------------
