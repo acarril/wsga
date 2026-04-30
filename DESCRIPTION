@@ -1,6 +1,6 @@
 Package: rddsga
 Title: Weighted Subgroup Analysis in Regression Discontinuity Designs
-Version: 0.1.0
+Version: 0.2.0
 Authors@R:
     person("Alvaro", "Carril", email = "alvarocarril@gmail.com", role = c("aut", "cre"))
 Description: Implements inverse probability weighted (IPW) subgroup analysis for

@@ -377,15 +377,12 @@ rddsga <- function(formula,
     est$se_g0    <- se_g0_b;   est$se_g1    <- se_g1_b
     est$se_diff  <- se_diff_b
     est$t_g0     <- t_g0_b;    est$t_g1     <- t_g1_b;  est$t_diff <- t_diff_b
-    est$p_g0     <- boot_result$pval[["g0"]]
-    est$p_g1     <- boot_result$pval[["g1"]]
-    # diff p-value: normal approx on bootstrap SE
-    est$p_diff   <- 2 * (1 - pnorm(abs(t_diff_b)))
-    est$ci_g0    <- c(lb = boot_result$ci["lb", "g0"], ub = boot_result$ci["ub", "g0"])
-    est$ci_g1    <- c(lb = boot_result$ci["lb", "g1"], ub = boot_result$ci["ub", "g1"])
-    q95          <- qnorm(0.975)
-    est$ci_diff  <- c(lb = est$b_diff - q95 * se_diff_b,
-                      ub = est$b_diff + q95 * se_diff_b)
+    est$p_g0    <- boot_result$pval[["g0"]]
+    est$p_g1    <- boot_result$pval[["g1"]]
+    est$p_diff  <- boot_result$pval[["diff"]]
+    est$ci_g0   <- c(lb = boot_result$ci["lb", "g0"],   ub = boot_result$ci["ub", "g0"])
+    est$ci_g1   <- c(lb = boot_result$ci["lb", "g1"],   ub = boot_result$ci["ub", "g1"])
+    est$ci_diff <- c(lb = boot_result$ci["lb", "diff"],  ub = boot_result$ci["ub", "diff"])
     est$vcov_2x2 <- V_boot
   }
 

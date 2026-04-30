@@ -69,17 +69,23 @@ run_bootstrap <- function(run_one_rep, data, B, est,
   draws_ok <- draws[ok, , drop = FALSE]
   B_ok     <- nrow(draws_ok)
 
-  # Variance-covariance from bootstrap distribution
-  V_boot <- var(draws_ok)
+  # Add diff = g1 - g0 as third column
+  draws_ok <- cbind(draws_ok, diff = draws_ok[, "g1"] - draws_ok[, "g0"])
+
+  # Variance-covariance from bootstrap distribution (g0, g1 only)
+  V_boot <- var(draws_ok[, c("g0", "g1")])
+
+  # Point estimates for all three parameters (needed for empirical p-values)
+  est_all <- c(est, diff = est[2] - est[1])
 
   # Empirical p-values: (1 + #{|draw| >= |est|}) / (B_ok + 1)
-  pval <- sapply(seq_len(2), function(g) {
-    cnt <- sum(abs(draws_ok[, g]) >= abs(est[g]))
+  pval <- sapply(seq_len(3), function(g) {
+    cnt <- sum(abs(draws_ok[, g]) >= abs(est_all[g]))
     (1 + cnt) / (B_ok + 1)
   })
-  names(pval) <- c("g0", "g1")
+  names(pval) <- c("g0", "g1", "diff")
 
-  # Empirical CIs: 2.5 / 97.5 percentiles
+  # Empirical CIs: 2.5 / 97.5 percentiles for all three parameters
   ci <- apply(draws_ok, 2, quantile, probs = c(0.025, 0.975))
   rownames(ci) <- c("lb", "ub")
 
