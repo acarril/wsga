@@ -1,0 +1,45 @@
+R/balance.R
+  s_4cb00f9b578a6e::t_1f5243682877d0 3
+README.md
+  s_4cb00f9b578a6e::t_c075cb8a160717 17-19,26,29
+R/bootstrap.R
+  s_4cb00f9b578a6e::t_f6dad42df1f3dc 22
+stata/wsga.ado
+  s_4cb00f9b578a6e::t_132446992af5bd 1137-1147
+  s_4cb00f9b578a6e::t_6be9b63d690c7f 1-2
+stata/rddsga.ado
+  s_4cb00f9b578a6e::t_508c2cc8eacb52 1,4-5
+stata/rddsga.pkg
+  s_4cb00f9b578a6e::t_65b5c916deb076 1-13,15-19,21,23-24,29,31-32
+stata/wsga.sthlp
+  s_4cb00f9b578a6e::t_0d6f412af3a298 197
+  s_4cb00f9b578a6e::t_1eab0da9f2b419 266
+  s_4cb00f9b578a6e::t_f942573cd5a28c 12-172,204
+  s_4cb00f9b578a6e::t_8456675f5ecc9e 188
+  s_4cb00f9b578a6e::t_9864fa954a316f 191
+  s_4cb00f9b578a6e::t_0e014e1888f098 2
+  s_4cb00f9b578a6e::t_a2897a3010364e 194
+  s_4cb00f9b578a6e::t_97b02554adb559 6
+stata/wsga.pkg
+  s_4cb00f9b578a6e::t_126bf46905e287 1-37
+stata/stata.toc
+  s_4cb00f9b578a6e::t_b5a4e07bf2359e 2-4
+stata/rddsga.sthlp
+  s_4cb00f9b578a6e::t_b9d9c22c5a5ac1 2,6,12,15,18,21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "8aa5ffa653394c691f3739b04846a292a95bc3b9",
+  "prompts": {},
+  "sessions": {
+    "s_4cb00f9b578a6e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "25e699ac-6a44-4a2e-8c22-4a4c2456b65f",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
