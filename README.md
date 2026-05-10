@@ -1,10 +1,10 @@
-# rddsga
+# wsga
 
-**Weighted Subgroup Analysis in Regression Discontinuity Designs**
+**Weighted Subgroup Analysis**
 
-Implements inverse probability weighted (IPW) subgroup analysis for regression discontinuity (RD) designs. When subgroups differ in observed moderators near the cutoff, a naive comparison of subgroup-specific RD estimates conflates the causal effect of the subgroup characteristic with the effect of correlated moderators. Reweighting observations via IPW balances observed moderators across subgroups at the cutoff, isolating the subgroup-attributable component of the treatment effect difference.
+Implements inverse probability weighted (IPW) subgroup analysis for research designs that require control variables for identification. When subgroups differ in observed moderators, a naive comparison of subgroup-specific treatment effects conflates the causal effect of the subgroup characteristic with the effect of correlated moderators. Reweighting observations via IPW balances observed moderators across subgroups, isolating the subgroup-attributable component of the treatment effect difference.
 
-Both a **Stata** package and an **R** package are included in this repository.
+Both a **Stata** package and an **R** package are included in this repository. Currently both implement weighted subgroup analysis for **regression discontinuity (RD)** designs; **sharp difference-in-differences (DiD)** support is planned.
 
 ---
 
@@ -40,17 +40,17 @@ See `help rddsga` for full documentation.
 ### Installation
 
 ```r
-devtools::install_github("acarril/rddsga")
+devtools::install_github("acarril/wsga")
 ```
 
 ### Quick start
 
 ```r
-library(rddsga)
+library(wsga)
 data(rddsga_synth)
 
 # Sharp RD with IPW balancing moderator m, bootstrap SEs
-fit <- rddsga(
+fit <- wsga(
   y ~ m | sgroup,
   data    = rddsga_synth,
   running = ~ x,
@@ -62,7 +62,7 @@ print(fit)
 summary(fit)   # also shows balance tables
 ```
 
-See `?rddsga` and `vignette("rddsga-intro")` for full documentation.
+See `?wsga` and `vignette("wsga-intro")` for full documentation. The previous function name `rddsga()` is retained as a deprecated alias.
 
 ---
 
@@ -72,4 +72,4 @@ Carril, Alvaro, Andre Cazor, Maria Paula Gerardino, Stephan Litschig, and Dina P
 
 ## Issues
 
-Please report bugs at <https://github.com/acarril/rddsga/issues>.
+Please report bugs at <https://github.com/acarril/wsga/issues>.
