@@ -12,26 +12,21 @@ Both a **Stata** package and an **R** package are included in this repository. C
 
 ### Installation
 
-From SSC:
-```stata
-ssc install rddsga
-```
-
 Latest version from this repository:
 ```stata
-net from https://raw.githubusercontent.com/acarril/rddsga/main/stata/
-net install rddsga
-net get rddsga
+net from https://raw.githubusercontent.com/acarril/wsga/main/stata/
+net install wsga
+net get wsga
 ```
 
 ### Quick start
 
 ```stata
 use rddsga_synth
-rddsga Y Z X1 X2, sgroup(G) bwidth(10) reducedform bsreps(200)
+wsga Y Z X1 X2, sgroup(G) bwidth(10) reducedform bsreps(200)
 ```
 
-See `help rddsga` for full documentation.
+See `help wsga` for full documentation. The previous command name `rddsga` is retained as a deprecated alias and is installed alongside `wsga`.
 
 ---
 

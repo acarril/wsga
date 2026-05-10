@@ -19,7 +19,7 @@ stratified_resample <- function(n, strata = NULL) {
 
 #' Bootstrap variance-covariance matrix and inference
 #'
-#' Mirrors the `myboo` subroutine in `rddsga.ado`. Each bootstrap replication
+#' Mirrors the `myboo` subroutine in `wsga.ado`. Each bootstrap replication
 #' resamples the full dataset (optionally stratified), refits the IPW
 #' propensity score and main regression, and records the two per-subgroup
 #' coefficients. The returned variance matrix is used for SE calculation and

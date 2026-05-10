@@ -1,0 +1,40 @@
+v 1.2.0
+d 'WSGA': Weighted subgroup analysis
+d
+d  wsga conducts weighted subgroup analysis for research designs that
+d  require control variables for identification. Currently it supports
+d  regression discontinuity (RD) designs (sharp and fuzzy); sharp
+d  difference-in-differences (DiD) is planned. Observations in each
+d  subgroup are weighted by the inverse of their conditional probabilities
+d  to belong to that subgroup, given a set of moderators. Analyzing the
+d  differential treatment effect in the reweighted sample helps isolate the
+d  difference due to the subgroup characteristic of interest from other
+d  observable dimensions.
+d
+d  This package also installs the deprecated rddsga command (alias for wsga).
+d
+d KW: Weighted subgroup analysis
+d KW: WSGA
+d KW: Subgroup analysis
+d KW: Regression discontinuity
+d KW: RDD
+d KW: IPW
+d KW: Inverse probability weighting
+d
+d Requires: Stata version 11
+d
+d Distribution-Date: 20260509
+d
+d Authors: Alvaro Carril
+d          Andre Cazor, PUC Chile
+d          Maria Paula Gerardino, Inter-American Development Bank
+d          Stephan Litschig, National Graduate Institute for Policy Studies
+d          Dina Pomeranz, University of Zurich
+d
+d Support: report issues at https://github.com/acarril/wsga/issues
+d
+F wsga.ado
+F wsga.sthlp
+F rddsga.ado
+F rddsga.sthlp
+f rddsga_synth.dta
