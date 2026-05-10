@@ -1,4 +1,4 @@
-*! 1.1.0 Alvaro Carril 2026-04-30
+*! 1.1.1 Alvaro Carril 2026-05-09
 program define rddsga, eclass
 version 11.1
 syntax varlist(min=2 numeric fv) [if] [in], ///
@@ -503,9 +503,18 @@ if "`ivregress'" != "" | "`reducedform'" != "" | "`firststage'" != "" {
     scalar t_g`g' = b_g`g'/se_g`g'
     // P-value and confidence interval
     if "`bootstrap'" != "nobootstrap" {
-      scalar p_g`g'     = e(pval`g')
-      scalar ci_lb_g`g' = e(lb_g`g')
-      scalar ci_ub_g`g' = e(ub_g`g')
+      if "`normal'" != "" {
+        // Normal approximation using bootstrap SE
+        scalar p_g`g'     = 2*(1 - normal(abs(t_g`g')))
+        scalar ci_lb_g`g' = b_g`g' - invnormal(0.975)*se_g`g'
+        scalar ci_ub_g`g' = b_g`g' + invnormal(0.975)*se_g`g'
+      }
+      else {
+        // Empirical (percentile) bootstrap CIs and (1+count)/(B+1) p-values
+        scalar p_g`g'     = e(pval`g')
+        scalar ci_lb_g`g' = e(lb_g`g')
+        scalar ci_ub_g`g' = e(ub_g`g')
+      }
     }
     else {
       scalar p_g`g'     = ttail(df, abs(t_g`g'))*2
@@ -526,12 +535,21 @@ if "`ivregress'" != "" | "`reducedform'" != "" | "`firststage'" != "" {
   scalar t_diff = b_diff/se_diff
   // P-value and confidence interval
   if "`bootstrap'" != "nobootstrap" {
-    scalar p_diff     = e(pval_diff)
-    scalar ci_lb_diff = e(lb_diff)
-    scalar ci_ub_diff = e(ub_diff)
+    if "`normal'" != "" {
+      // Normal approximation using bootstrap SE
+      scalar p_diff     = 2*(1 - normal(abs(t_diff)))
+      scalar ci_lb_diff = b_diff - invnormal(0.975)*se_diff
+      scalar ci_ub_diff = b_diff + invnormal(0.975)*se_diff
+    }
+    else {
+      // Empirical (percentile) bootstrap CIs and (1+count)/(B+1) p-values
+      scalar p_diff     = e(pval_diff)
+      scalar ci_lb_diff = e(lb_diff)
+      scalar ci_ub_diff = e(ub_diff)
+    }
   }
   else {
-    scalar p_diff     = 2*(1-normal(abs(t_diff)))
+    scalar p_diff     = ttail(df, abs(t_diff))*2
     scalar ci_lb_diff = b_diff + invttail(df, 0.975)*se_diff
     scalar ci_ub_diff = b_diff + invttail(df, 0.025)*se_diff
   }
