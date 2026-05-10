@@ -1,0 +1,21 @@
+stata/rddsga.ado
+  s_4cb00f9b578a6e::t_007fec5cf5a31e 538-549,552
+  s_4cb00f9b578a6e::t_3f905ea63f8409 1
+  s_4cb00f9b578a6e::t_c230a4045c39bd 506-517
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "a9b9636d1833c80c11444a89403e9a390b3d7a0d",
+  "prompts": {},
+  "sessions": {
+    "s_4cb00f9b578a6e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "25e699ac-6a44-4a2e-8c22-4a4c2456b65f",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
