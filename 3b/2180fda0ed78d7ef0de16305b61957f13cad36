@@ -1,0 +1,71 @@
+tests/testthat/test-deprecated.R
+  s_4cb00f9b578a6e::t_a0ac200cc955ac 1-16
+NAMESPACE
+  s_4cb00f9b578a6e::t_aa97cbfc1c6af0 3-8,10
+vignettes/wsga-intro.Rmd
+  s_4cb00f9b578a6e::t_e2e079f6ed5270 57
+  s_4cb00f9b578a6e::t_6c9d61f84cb789 16-22
+  s_4cb00f9b578a6e::t_147677954176ea 41
+  s_4cb00f9b578a6e::t_41d07f2341653d 2-5
+  s_4cb00f9b578a6e::t_73a88c5079a649 33
+  s_4cb00f9b578a6e::t_b0e9549600e517 73
+  s_4cb00f9b578a6e::t_676ba418cd634d 90
+R/data.R
+  s_4cb00f9b578a6e::t_bef869d8fe1e51 1
+man/rddsga.Rd
+  s_4cb00f9b578a6e::t_59a661ac8baa8e 2,5,7,10,13,16-18,20-21,23
+README.md
+  s_4cb00f9b578a6e::t_e2a9aa7b1760b7 1,3,5,7
+  s_4cb00f9b578a6e::t_091484bad6b4f2 75
+  s_4cb00f9b578a6e::t_c0fbc18d382a0b 43,49,53,65
+man/rddsga_synth.Rd
+  s_4cb00f9b578a6e::t_5713a9d8fd78e3 6
+tests/testthat/test-estimation.R
+  s_4cb00f9b578a6e::t_e733edb57c114a 7,53,60,68
+  s_4cb00f9b578a6e::t_d7c6681c4d049d 21,31
+  s_4cb00f9b578a6e::t_2569ae4deca598 3
+  s_4cb00f9b578a6e::t_70b6327bb14a1d 20
+  s_4cb00f9b578a6e::t_36ecd85570ec3b 4,12,39,50,57,64
+  s_4cb00f9b578a6e::t_afced89580815e 70-71
+tests/testthat.R
+  s_4cb00f9b578a6e::t_9223c804f7cc32 10,12
+DESCRIPTION
+  s_4cb00f9b578a6e::t_f1789f44f5b042 1-3,7-14
+  s_4cb00f9b578a6e::t_ef27ebf7b65209 31-32
+R/wsga.R
+  s_4cb00f9b578a6e::t_2d0126abbf6532 497
+  s_4cb00f9b578a6e::t_d71ac3c3374e20 536
+  s_4cb00f9b578a6e::t_2ba9ee2481e4dd 562
+  s_4cb00f9b578a6e::t_571ff11d8b8efb 96-108
+  s_4cb00f9b578a6e::t_57cc75a18376f4 294-390,461-477
+  s_4cb00f9b578a6e::t_851dd7388f7c9a 69
+  s_4cb00f9b578a6e::t_2afe0126a68db1 570-574
+  s_4cb00f9b578a6e::t_1eae8bfaf78419 587
+  s_4cb00f9b578a6e::t_6877ac74db592b 424
+man/wsga.Rd
+  s_4cb00f9b578a6e::t_bf0173fbeebc7c 118
+  s_4cb00f9b578a6e::t_539fc0c8f19911 2-7
+  s_4cb00f9b578a6e::t_9dc26bf09f1710 152-160
+R/deprecated.R
+  s_4cb00f9b578a6e::t_b32409bc02a77b 1-15
+tests/testthat/test-bootstrap.R
+  s_4cb00f9b578a6e::t_df4c04baeade77 4,14,23,32
+  s_4cb00f9b578a6e::t_c9e16de6010619 45-46
+  s_4cb00f9b578a6e::t_4eeb0b9f515a7e 41-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "3b2180fda0ed78d7ef0de16305b61957f13cad36",
+  "prompts": {},
+  "sessions": {
+    "s_4cb00f9b578a6e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "25e699ac-6a44-4a2e-8c22-4a4c2456b65f",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
