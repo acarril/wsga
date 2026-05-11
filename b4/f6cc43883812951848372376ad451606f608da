@@ -1,0 +1,19 @@
+.claude/skills/wsga-version-bump/SKILL.md
+  s_0b1584b02571f7::t_23dec8cb6783e8 1-169
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.6",
+  "base_commit_sha": "b4f6cc43883812951848372376ad451606f608da",
+  "prompts": {},
+  "sessions": {
+    "s_0b1584b02571f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a3299ef9-c4bb-4fc2-946d-d2e118b6054e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
