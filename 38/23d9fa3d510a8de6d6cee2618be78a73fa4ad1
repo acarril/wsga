@@ -1,0 +1,23 @@
+inst/generate_did_synth.R
+  s_4cb00f9b578a6e::t_d9265e05429da1 1-67
+man/wsga_did_synth.Rd
+  s_4cb00f9b578a6e::t_0173d70eed0e68 1-36
+vignettes/wsga-did-intro.Rmd
+  s_4cb00f9b578a6e::t_2b72939920e567 1-121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.6",
+  "base_commit_sha": "3823d9fa3d510a8de6d6cee2618be78a73fa4ad1",
+  "prompts": {},
+  "sessions": {
+    "s_4cb00f9b578a6e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "25e699ac-6a44-4a2e-8c22-4a4c2456b65f",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
