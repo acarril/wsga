@@ -1,4 +1,4 @@
-*! 1.3.2 Alvaro Carril 2026-05-11
+*! 1.4.0 Alvaro Carril 2026-05-11
 program define wsga, eclass
 version 11.1
 syntax varlist(min=1 numeric fv) [if] [in], ///
@@ -8,7 +8,8 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   	IPSWeight(name) PSCore(name) comsup /// newvars
     BALance(varlist numeric) DIBALance probit /// balancepscore opts
     IVregress REDUCEDform FIRSTstage vce(string) p(int 1) m(int 2) rbalance(int 0) /// model opts
-    noBOOTstrap bsreps(real 50) FIXEDbootstrap BLOCKbootstrap(string) NORMal noipsw weights(string) ] // bootstrap options
+    noBOOTstrap bsreps(real 50) FIXEDbootstrap FIXEDps BLOCKbootstrap(string) NORMal noipsw weights(string) ///
+    Seed(string) ] // bootstrap options
 
 // ─── Design dispatch ──────────────────────────────────────────────────────────
 if "`design'" == "" local design "rdd"
@@ -347,6 +348,7 @@ if "`ipsw'" != "noipsw" & `: list sizeof balance' > 0 {
     oweights(`oweights') m(`m') binarymodel(`binarymodel') pscore(`pscore')
   if "`comsup'" != "" local psw_boot_opts `psw_boot_opts' comsup
 }
+if "`seed'" != "" local psw_boot_opts `psw_boot_opts' seed(`seed')
 
 * First stage
 *-------------------------------------------------------------------------------
@@ -707,7 +709,7 @@ end
 program define myboo, eclass
   syntax anything [, PSW IPSWeight(name) KERNELipsw(name) KWT(name) ///
     TOuse(name) BWIDTH(string) BALance(varlist) OWeights(name) ///
-    M(integer 2) BINarymodel(string) PSCore(name) COmsup]
+    M(integer 2) BINarymodel(string) PSCore(name) COmsup Seed(string)]
 
   local svar : word 1 of `anything'
   local cvar : word 2 of `anything'
@@ -736,6 +738,7 @@ program define myboo, eclass
   di ""
   _dots 0, title(Bootstrap replications) reps(`B')
   cap mat drop cumulative
+  if "`seed'" != "" set seed `seed'
   tempvar COMSUP_b
   forvalues i=1/`B' {
     preserve
@@ -1185,8 +1188,8 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     BALance(varlist numeric) DIBALance probit ///
     IPSWeight(name) PSCore(name) comsup ///
     vce(string) m(int 2) rbalance(int 0) ///
-    noBOOTstrap bsreps(real 200) FIXEDbootstrap BLOCKbootstrap(string) ///
-    NORMal noipsw weights(string) ///
+    noBOOTstrap bsreps(real 200) FIXEDbootstrap FIXEDps BLOCKbootstrap(string) ///
+    NORMal noipsw weights(string) Seed(string) ///
     /* RDD-only options that are silently accepted and ignored: */ ///
     BWidth(real -1) Cutoff(real 0) Kernel(string) ///
     fuzzy(name) IVregress REDUCEDform FIRSTstage p(int 1) ]
@@ -1374,6 +1377,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     matrix `_wsga_did_draws' = J(`bsreps', 2, .)
 
     display as text "Cluster bootstrap (`bsreps' reps):"
+    if "`seed'" != "" set seed `seed'
     forvalues _b = 1/`bsreps' {
       qui use `_wsga_did_panel', clear
       capture {
@@ -1383,12 +1387,19 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
         qui gen double `_b_pscore' = .
         qui gen double `_b_ipw'    = 1
         if "`ipsw'" != "noipsw" & `: list sizeof balance' > 0 {
-          if "`probit'" != "" qui probit `sgroup' `balance'
-          else                qui logit  `sgroup' `balance'
-          qui predict double _wsga_ps_b, pr
-          qui replace `_b_pscore' = _wsga_ps_b
-          qui drop _wsga_ps_b
+          if "`fixedps'" != "" {
+            // fixedps: carry original-sample pscore; skip logit/probit refit
+            qui replace `_b_pscore' = `pscore_var'
+          }
+          else {
+            if "`probit'" != "" qui probit `sgroup' `balance'
+            else                qui logit  `sgroup' `balance'
+            qui predict double _wsga_ps_b, pr
+            qui replace `_b_pscore' = _wsga_ps_b
+            qui drop _wsga_ps_b
+          }
 
+          // IPW normalization: always recount units per bootstrap rep
           tempvar _b_uf
           qui by _wsga_new_unit (`sgroup'), sort: gen byte `_b_uf' = (_n == 1)
           qui count if `_b_uf' & `sgroup' == 0 & !mi(`_b_pscore')
