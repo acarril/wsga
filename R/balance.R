@@ -27,7 +27,10 @@ compute_balance <- function(balance_vars, data, running, G, sgroup0,
                             within_bw, touse, weights, comsup_idx,
                             rbalance = 0, N_G0, N_G1) {
   active   <- touse & within_bw & comsup_idx
-  x        <- data[[running]]
+  # `running` is NULL in DiD (no running variable).  Guard the lookup:
+  # `data[[NULL]]` errors on data.frames.  `x` is only consumed in the
+  # rbalance == 0 branch (mean-at-cutoff), which DiD never enters.
+  x        <- if (is.null(running) || !nzchar(running)) NULL else data[[running]]
   w_active <- weights[active]
 
   n_bal <- length(balance_vars)
