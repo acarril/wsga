@@ -69,7 +69,9 @@ For DiD: {it:depvar} is the outcome; {it:indepvars} are optional covariates incl
 {synopt :{opt weights(weightsvar)}}optional observation weights multiplied into the kernel (RDD) or used as frequency weights (DiD){p_end}
 {synopt :{opt noboot:strap}}suppress bootstrap standard errors; use analytical SEs only{p_end}
 {synopt :{opt bsr:eps(#)}}bootstrap replications; default is {opt bsreps(50)}{p_end}
+{synopt :{opt seed(string)}}set Stata's RNG seed before the bootstrap loop for reproducible results; mirrors the R port's {opt seed} argument{p_end}
 {synopt :{opt norm:al}}report normal-approximation p-values and CIs instead of empirical (percentile){p_end}
+{synopt :{opt fixedps}}({opt design(did)} only) hold the propensity score at the original-sample fit across bootstrap replicates, skipping the logit/probit refit per rep; reduces bootstrap cost and isolates outcome-model variance. {bf:Warning:} understates SEs relative to the paper's intended interpretation. Default is to refit per rep.{p_end}
 {synopt :{opt block:bootstrap(varname)}}stratified bootstrap: resample within strata defined by {it:varname}{p_end}
 {synoptline}
 {p2colreset}{...}
@@ -216,8 +218,20 @@ For {opt design(did)} with a {opt unit()} variable, the default upgrades to {opt
 {opt bsreps(#)} number of bootstrap replications; default is {opt bsreps(50)}.
 
 {phang}
+{opt seed(string)} set Stata's RNG seed before the bootstrap loop so results are reproducible across runs.
+Accepts any value valid for {help set seed}.
+Equivalent to calling {cmd:set seed} {it:value} immediately before {cmd:wsga}.
+
+{phang}
+{opt fixedps} ({opt design(did)} only) hold the propensity score at the original-sample fit throughout the bootstrap — each replicate skips the logit/probit refit and uses the pscore computed on the original data.
+Two uses: (1) variance decomposition — compare SEs with and without {opt fixedps} to quantify how much bootstrap variance comes from the PS step versus the outcome model; (2) speed — each rep is roughly twice as fast when the PS fit is expensive.
+{bf:Warning:} {opt fixedps} understates SEs relative to the paper's intended interpretation, which refits the PS per replicate. Default is to refit.
+
+{phang}
 {opt normal} use normal-approximation p-values and CIs.
-By default {cmd:wsga} uses the percentile method: the empirical p-value is the share of bootstrap draws with |coef| >= |estimate|, and CIs are the 2.5th/97.5th percentiles of the bootstrap distribution.
+By default {cmd:wsga} reports (i) empirical p-values computed by recentering bootstrap draws — counting the fraction where |draw - estimate| >= |estimate|, which tests H0: coef = 0 — and (ii) percentile CIs at the 2.5th/97.5th quantiles of the raw draw distribution.
+Note: the recentered p-values and the percentile CIs are derived from different distributional objects and are not exactly dual (a p-value below 0.05 does not guarantee the 95% CI excludes zero, and vice versa).
+The {opt normal} option is fully consistent: both p-values and CIs are derived from the normal distribution with the bootstrap standard error.
 
 {phang}
 {opt blockbootstrap(varname)} stratified bootstrap: resample within strata defined by {it:varname}.
