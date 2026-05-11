@@ -1,4 +1,4 @@
-*! 1.3.1 Alvaro Carril 2026-05-11
+*! 1.3.2 Alvaro Carril 2026-05-11
 program define wsga, eclass
 version 11.1
 syntax varlist(min=1 numeric fv) [if] [in], ///
@@ -835,12 +835,13 @@ program define myboo, eclass
   ereturn scalar N_reps = `B'
   ereturn scalar level = 95
   // Empirical p-values for subgroups
+  // Recentered: count draws where |draw - est| >= |est|, testing H0: coef=0
   cap scalar drop bscoef
   forvalues g = 0/1 {
     local count = 0
     forvalues i = 1/`B' {
       scalar bscoef = cumulative[`i',`=`g'+1']
-      if abs(bscoef) >= abs(b[1,`=`g'+1']) local count = `count'+1
+      if abs(bscoef - b[1,`=`g'+1']) >= abs(b[1,`=`g'+1']) local count = `count'+1
     }
     scalar pval`g' = (1+`count') / (`B' + 1)
     ereturn scalar pval`g' = pval`g'
@@ -850,7 +851,7 @@ program define myboo, eclass
   local count_diff = 0
   forvalues i = 1/`B' {
     scalar bscoef = cumulative[`i',3]
-    if abs(bscoef) >= abs(orig_diff) local count_diff = `count_diff' + 1
+    if abs(bscoef - orig_diff) >= abs(orig_diff) local count_diff = `count_diff' + 1
   }
   scalar pval_diff = (1 + `count_diff') / (`B' + 1)
   ereturn scalar pval_diff = pval_diff
@@ -1469,11 +1470,11 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
       scalar ci_lb_diff  = r(r1)
       scalar ci_ub_diff  = r(r2)
 
-      qui count if abs(_draw1)    >= abs(b_g0)
+      qui count if abs(_draw1    - b_g0)   >= abs(b_g0)
       scalar p_g0    = (1 + r(N)) / (B_ok + 1)
-      qui count if abs(_draw2)    >= abs(b_g1)
+      qui count if abs(_draw2    - b_g1)   >= abs(b_g1)
       scalar p_g1    = (1 + r(N)) / (B_ok + 1)
-      qui count if abs(_drawdiff) >= abs(b_diff)
+      qui count if abs(_drawdiff - b_diff) >= abs(b_diff)
       scalar p_diff  = (1 + r(N)) / (B_ok + 1)
     }
     restore

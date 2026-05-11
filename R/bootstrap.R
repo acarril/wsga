@@ -192,7 +192,7 @@ run_bootstrap <- function(run_one_rep, data, B, est,
   est_all  <- c(est, diff = est[2] - est[1])
 
   pval <- sapply(seq_len(3), function(g) {
-    cnt <- sum(abs(draws_ok[, g]) >= abs(est_all[g]))
+    cnt <- sum(abs(draws_ok[, g] - est_all[g]) >= abs(est_all[g]))
     (1 + cnt) / (B_ok + 1)
   })
   names(pval) <- c("g0", "g1", "diff")

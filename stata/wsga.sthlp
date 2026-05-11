@@ -217,7 +217,9 @@ For {opt design(did)} with a {opt unit()} variable, the default upgrades to {opt
 
 {phang}
 {opt normal} use normal-approximation p-values and CIs.
-By default {cmd:wsga} uses the percentile method: the empirical p-value is the share of bootstrap draws with |coef| >= |estimate|, and CIs are the 2.5th/97.5th percentiles of the bootstrap distribution.
+By default {cmd:wsga} reports (i) empirical p-values computed by recentering bootstrap draws — counting the fraction where |draw - estimate| >= |estimate|, which tests H0: coef = 0 — and (ii) percentile CIs at the 2.5th/97.5th quantiles of the raw draw distribution.
+Note: the recentered p-values and the percentile CIs are derived from different distributional objects and are not exactly dual (a p-value below 0.05 does not guarantee the 95% CI excludes zero, and vice versa).
+The {opt normal} option is fully consistent: both p-values and CIs are derived from the normal distribution with the bootstrap standard error.
 
 {phang}
 {opt blockbootstrap(varname)} stratified bootstrap: resample within strata defined by {it:varname}.
