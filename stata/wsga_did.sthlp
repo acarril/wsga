@@ -1,5 +1,6 @@
 {smcl}
-{* *! version 1.5.0 2026-05-11}{...}
+{* *! version 1.0.1 2026-05-11}{...}
+{viewerjumpto "Stored results" "wsga_did##results"}{...}
 {title:Title}
 
 {pstd}
@@ -69,6 +70,58 @@ Clustering is always on {it:unit}.
 
 {pstd}With cluster bootstrap:{p_end}
 {phang2}{cmd:. wsga did Y M, sgroup(G) unit(id) time(t) treat(D) bsreps(200) seed(1)}{p_end}
+
+
+{marker results}{...}
+{title:Stored results}
+
+{pstd}
+{cmd:wsga did} stores the following in {cmd:e()}:
+
+{synoptset 23 tabbed}{...}
+{p2col 5 23 26 2: Scalars}{p_end}
+{synopt:{cmd:e(b_g0)}}subgroup-0 treatment effect{p_end}
+{synopt:{cmd:e(b_g1)}}subgroup-1 treatment effect{p_end}
+{synopt:{cmd:e(b_diff)}}{cmd:e(b_g1)} minus {cmd:e(b_g0)}{p_end}
+{synopt:{cmd:e(se_g0)}}standard error for subgroup-0{p_end}
+{synopt:{cmd:e(se_g1)}}standard error for subgroup-1{p_end}
+{synopt:{cmd:e(se_diff)}}standard error for the difference{p_end}
+{synopt:{cmd:e(t_g0)}}t or z statistic for subgroup-0{p_end}
+{synopt:{cmd:e(t_g1)}}t or z statistic for subgroup-1{p_end}
+{synopt:{cmd:e(t_diff)}}t or z statistic for the difference{p_end}
+{synopt:{cmd:e(p_g0)}}p-value for subgroup-0{p_end}
+{synopt:{cmd:e(p_g1)}}p-value for subgroup-1{p_end}
+{synopt:{cmd:e(p_diff)}}p-value for the difference{p_end}
+{synopt:{cmd:e(ci_lb_g0)}}95% confidence interval lower bound, subgroup-0{p_end}
+{synopt:{cmd:e(ci_ub_g0)}}95% confidence interval upper bound, subgroup-0{p_end}
+{synopt:{cmd:e(ci_lb_g1)}}95% confidence interval lower bound, subgroup-1{p_end}
+{synopt:{cmd:e(ci_ub_g1)}}95% confidence interval upper bound, subgroup-1{p_end}
+{synopt:{cmd:e(ci_lb_diff)}}95% confidence interval lower bound, difference{p_end}
+{synopt:{cmd:e(ci_ub_diff)}}95% confidence interval upper bound, difference{p_end}
+{synopt:{cmd:e(N_G0)}}number of observations in subgroup 0{p_end}
+{synopt:{cmd:e(N_G1)}}number of observations in subgroup 1{p_end}
+{synopt:{cmd:e(df)}}degrees of freedom for analytical inference{p_end}
+{synopt:{cmd:e(B_ok)}}(bootstrap) number of successful replications{p_end}
+{synopt:{cmd:e(N_clust)}}(bootstrap) number of clusters{p_end}
+
+{p2col 5 23 26 2: Macros}{p_end}
+{synopt:{cmd:e(cmd)}}{cmd:wsga}{p_end}
+{synopt:{cmd:e(subcmd)}}{cmd:did}{p_end}
+{synopt:{cmd:e(depvar)}}name of dependent variable{p_end}
+
+{p2col 5 23 26 2: Matrices}{p_end}
+{synopt:{cmd:e(b)}}1{cmd:x}2 coefficient vector with columns named {cmd:G0_Z} and {cmd:G1_Z}{p_end}
+{synopt:{cmd:e(V)}}2{cmd:x}2 variance-covariance matrix; bootstrap-derived when bootstrap is on, analytical (cluster-robust) otherwise{p_end}
+
+{p2col 5 23 26 2: Functions}{p_end}
+{synopt:{cmd:e(sample)}}marks estimation sample{p_end}
+{p2colreset}{...}
+
+{pstd}
+Named column access works after estimation:{p_end}
+{phang2}{cmd:. matrix b = e(b)}{p_end}
+{phang2}{cmd:. scalar b_g0 = b[1,"G0_Z"]}{p_end}
+{phang2}{cmd:. scalar se_diff = sqrt(e(V)[1,1] + e(V)[2,2] - 2*e(V)[1,2])}{p_end}
 
 
 {title:See also}
