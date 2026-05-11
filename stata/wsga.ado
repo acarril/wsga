@@ -1351,7 +1351,138 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   scalar ci_lb_diff = b_diff + invttail(df, 0.975)*se_diff
   scalar ci_ub_diff = b_diff + invttail(df, 0.025)*se_diff
 
+  // ── Cluster bootstrap (refit PS per rep; Q1 + Q3 + Q4).
+  // Whole units are resampled with replacement; fresh unit IDs are assigned
+  // by bsample's idcluster() option so unit FE remain identified across
+  // duplicate draws (the Cameron-Gelbach-Miller recipe).  The analytical
+  // SE/CI/p scalars set above are overridden with bootstrap-based values.
+  scalar B_ok    = 0
+  scalar N_clust = .
+  scalar use_bootstrap = ("`bootstrap'" != "nobootstrap")
+  if use_bootstrap {
+    qui levelsof `unit' if `touse', local(_clusters)
+    scalar N_clust = `: word count `_clusters''
+    if N_clust < 30 {
+      di as text ///
+"Note: cluster bootstrap with " as result %4.0f N_clust as text " clusters.  Pairs-cluster bootstrap can substantially understate SEs at < ~30 clusters.  Consider supplementing with a wild cluster bootstrap-t (Stata: boottest)."
+    }
+    tempfile _wsga_did_panel
+    qui save `_wsga_did_panel'
+
+    tempname _wsga_did_draws
+    matrix `_wsga_did_draws' = J(`bsreps', 2, .)
+
+    display as text "Cluster bootstrap (`bsreps' reps):"
+    forvalues _b = 1/`bsreps' {
+      qui use `_wsga_did_panel', clear
+      capture {
+        qui bsample, cluster(`unit') idcluster(_wsga_new_unit)
+
+        tempvar _b_pscore _b_ipw
+        qui gen double `_b_pscore' = .
+        qui gen double `_b_ipw'    = 1
+        if "`ipsw'" != "noipsw" & `: list sizeof balance' > 0 {
+          if "`probit'" != "" qui probit `sgroup' `balance'
+          else                qui logit  `sgroup' `balance'
+          qui predict double _wsga_ps_b, pr
+          qui replace `_b_pscore' = _wsga_ps_b
+          qui drop _wsga_ps_b
+
+          tempvar _b_uf
+          qui by _wsga_new_unit (`sgroup'), sort: gen byte `_b_uf' = (_n == 1)
+          qui count if `_b_uf' & `sgroup' == 0 & !mi(`_b_pscore')
+          local _N0 = r(N)
+          qui count if `_b_uf' & `sgroup' == 1 & !mi(`_b_pscore')
+          local _N1 = r(N)
+          local _NT = `_N0' + `_N1'
+
+          qui replace `_b_ipw' = .
+          if `m' == 2 {
+            qui replace `_b_ipw' = (`_N1' / `_NT') / `_b_pscore'         if `sgroup' == 1 & !mi(`_b_pscore')
+            qui replace `_b_ipw' = (`_N0' / `_NT') / (1 - `_b_pscore')   if `sgroup' == 0 & !mi(`_b_pscore')
+          }
+          else if `m' == 1 {
+            qui replace `_b_ipw' = (1 - `_b_pscore') / `_b_pscore'        if `sgroup' == 1 & !mi(`_b_pscore')
+            qui replace `_b_ipw' = 1                                       if `sgroup' == 0
+          }
+          else {
+            qui replace `_b_ipw' = `_b_pscore' / (1 - `_b_pscore')        if `sgroup' == 0 & !mi(`_b_pscore')
+            qui replace `_b_ipw' = 1                                       if `sgroup' == 1
+          }
+          qui replace `_b_ipw' = 0 if mi(`_b_ipw')
+        }
+
+        qui xtset _wsga_new_unit
+        qui xtreg `depvar' `rhs' [pw=`_b_ipw'] if `_b_ipw' > 0, ///
+          fe vce(cluster _wsga_new_unit)
+        matrix `_wsga_did_draws'[`_b', 1] = _b[`G0_Z']
+        matrix `_wsga_did_draws'[`_b', 2] = _b[`G1_Z']
+        scalar B_ok = B_ok + 1
+      }
+      if mod(`_b', 10) == 0 | `_b' == `bsreps' di "  " %4.0f `_b' "/`bsreps'"
+    }
+    qui use `_wsga_did_panel', clear
+
+    if B_ok < 2 {
+      di as error "Cluster bootstrap produced fewer than 2 successful reps (got " B_ok ").  Try increasing bsreps or relaxing balance() / m()."
+      exit 498
+    }
+
+    // Aggregate: SEs, percentile CIs, (1+count)/(B+1) p-values
+    preserve
+    qui drop _all
+    qui svmat double `_wsga_did_draws', names(_draw)
+    qui keep if !mi(_draw1) & !mi(_draw2)
+    qui gen double _drawdiff = _draw2 - _draw1
+
+    qui summarize _draw1
+    scalar se_g0   = r(sd)
+    qui summarize _draw2
+    scalar se_g1   = r(sd)
+    qui summarize _drawdiff
+    scalar se_diff = r(sd)
+    scalar t_g0   = b_g0   / se_g0
+    scalar t_g1   = b_g1   / se_g1
+    scalar t_diff = b_diff / se_diff
+
+    if "`normal'" != "" {
+      // Normal approximation with bootstrap SE
+      scalar p_g0      = 2*(1 - normal(abs(t_g0)))
+      scalar p_g1      = 2*(1 - normal(abs(t_g1)))
+      scalar p_diff    = 2*(1 - normal(abs(t_diff)))
+      scalar ci_lb_g0   = b_g0   - invnormal(0.975)*se_g0
+      scalar ci_ub_g0   = b_g0   + invnormal(0.975)*se_g0
+      scalar ci_lb_g1   = b_g1   - invnormal(0.975)*se_g1
+      scalar ci_ub_g1   = b_g1   + invnormal(0.975)*se_g1
+      scalar ci_lb_diff = b_diff - invnormal(0.975)*se_diff
+      scalar ci_ub_diff = b_diff + invnormal(0.975)*se_diff
+    }
+    else {
+      // Empirical percentile CIs and (1+count)/(B+1) p-values
+      qui _pctile _draw1,    percentiles(2.5 97.5)
+      scalar ci_lb_g0    = r(r1)
+      scalar ci_ub_g0    = r(r2)
+      qui _pctile _draw2,    percentiles(2.5 97.5)
+      scalar ci_lb_g1    = r(r1)
+      scalar ci_ub_g1    = r(r2)
+      qui _pctile _drawdiff, percentiles(2.5 97.5)
+      scalar ci_lb_diff  = r(r1)
+      scalar ci_ub_diff  = r(r2)
+
+      qui count if abs(_draw1)    >= abs(b_g0)
+      scalar p_g0    = (1 + r(N)) / (B_ok + 1)
+      qui count if abs(_draw2)    >= abs(b_g1)
+      scalar p_g1    = (1 + r(N)) / (B_ok + 1)
+      qui count if abs(_drawdiff) >= abs(b_diff)
+      scalar p_diff  = (1 + r(N)) / (B_ok + 1)
+    }
+    restore
+  }
+
   // ── Display
+  local _stat_label = cond(use_bootstrap, "z", "t")
+  local _p_label    = cond(use_bootstrap, "P>|z|", "P>|t|")
+  local _ci_tag     = cond(use_bootstrap & "`normal'" == "", " (emp.)", "")
   di
   di as text "DiD subgroup analysis  |  unit: " as result "`unit'" ///
      as text "  |  time: " as result "`time'" ///
@@ -1361,9 +1492,9 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   di as text %12s abbrev("`depvar'",12) " {c |}" ///
     _col(15) "{ralign 11:Coef.}" ///
     _col(26) "{ralign 12:Std. Err.}" ///
-    _col(38) "{ralign 8:t }" ///
-    _col(46) "{ralign 8:P>|t|}" ///
-    _col(54) "{ralign 25:[95% Conf. Interval]}"
+    _col(38) "{ralign 8:`_stat_label' }" ///
+    _col(46) "{ralign 8:`_p_label'}" ///
+    _col(54) "{ralign 25:[95% Conf. Interval`_ci_tag']}"
   di as text "{hline 13}{c +}{hline 64}"
   di as text "Subgroup" _col(14) "{c |}"
   forvalues g = 0/1 {
@@ -1393,6 +1524,12 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   scalar N_G1 = r(N)
   di as text "N (G=0): " as result %4.0f N_G0 ///
      as text "   N (G=1): " as result %4.0f N_G1
+  if use_bootstrap {
+    di as text "Cluster bootstrap: " as result %4.0f B_ok ///
+       as text " / " as result `bsreps' ///
+       as text " reps, clustered on '" as result "`unit'" ///
+       as text "' (" as result %4.0f N_clust as text " clusters)"
+  }
 
   // ── Balance tables (aggregate + treated-only).  Per Q9a, in DiD mode
   // balance is reported both on the full active sample and conditional on
