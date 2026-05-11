@@ -1,6 +1,6 @@
 # wsga (R package) NEWS
 
-## wsga 0.8.0 (2026-05-11)
+## wsga 1.0.0 (2026-05-11)
 
 ### Breaking changes
 
@@ -37,7 +37,7 @@
 
 ## rddsga 0.3.0 → wsga 0.6.x (internal milestones)
 
-- Umbrella refactor: single `wsga()` entry point dispatching both RD and DiD paths (replaced by `wsga_rdd()` / `wsga_did()` in 0.8.0).
+- Umbrella refactor: single `wsga()` entry point dispatching both RD and DiD paths (replaced by `wsga_rdd()` / `wsga_did()` in 1.0.0).
 - S3 methods: `print`, `summary`, `coef`, `vcov`, `confint`, `nobs`.
 - `block_var` stratification for the bootstrap.
 - `seed` argument for reproducible bootstrap draws.
