@@ -1,5 +1,19 @@
 # wsga (R package) NEWS
 
+## wsga 1.0.1 (2026-05-11)
+
+### Bug fixes
+
+- **Stata**: `wsga did` now calls `ereturn post` at the end of `_wsga_did`,
+  trimming `e(b)` and `e(V)` to the two treatment-effect columns (`G0_Z`,
+  `G1_Z`). Previously the full `xtreg, fe` result was left in `e()`, so
+  `e(b)` / `e(V)` were unreliable in downstream code. Bootstrap path now also
+  computes the covariance of the two coefficient draws so that `e(V)` is fully
+  bootstrap-derived when bootstrap is on (#24).
+- **Stata**: align `*!` version line with unified `1.0.x` versioning.
+
+---
+
 ## wsga 1.0.0 (2026-05-11)
 
 ### Breaking changes
