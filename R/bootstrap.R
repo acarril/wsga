@@ -48,6 +48,11 @@ cluster_resample <- function(unique_clusters, cluster_strata = NULL) {
 #' @param cluster_var Character: name of the cluster column.
 #' @param cluster_ids The cluster column values, length nrow(data).
 #' @param drawn Drawn cluster IDs (output of `cluster_resample`).
+#' @param unit_var Optional character: name of a "nested" identifier column
+#'   (e.g. the DiD `unit` column when `cluster_var` is something coarser
+#'   like "state"). If supplied and different from `cluster_var`, fresh IDs
+#'   are also propagated to that column so unit FE remain identified when
+#'   two draws of the same cluster bring in overlapping units.
 #' @return A list with two elements:
 #'   - `data`: data frame with `length(drawn) × rows-per-cluster` rows.
 #'   - `orig_idx`: integer vector of the same length, where
@@ -55,13 +60,17 @@ cluster_resample <- function(unique_clusters, cluster_strata = NULL) {
 #'     row of the resampled data came from. Used by the `fixed_ps`
 #'     code path to look up the original-sample propensity score.
 #' @noRd
-build_cluster_rep_data <- function(data, cluster_var, cluster_ids, drawn) {
+build_cluster_rep_data <- function(data, cluster_var, cluster_ids, drawn,
+                                   unit_var = NULL) {
   parts          <- vector("list", length(drawn))
   orig_idx_parts <- vector("list", length(drawn))
   for (j in seq_along(drawn)) {
     rows <- which(cluster_ids == drawn[j])
     sub <- data[rows, , drop = FALSE]
     sub[[cluster_var]] <- paste0(as.character(drawn[j]), "__d", j)
+    if (!is.null(unit_var) && unit_var != cluster_var) {
+      sub[[unit_var]] <- paste0(as.character(sub[[unit_var]]), "__d", j)
+    }
     parts[[j]]          <- sub
     orig_idx_parts[[j]] <- rows
   }
@@ -102,6 +111,7 @@ build_cluster_rep_data <- function(data, cluster_var, cluster_ids, drawn) {
 run_bootstrap <- function(run_one_rep, data, B, est,
                           cluster_var = NULL,
                           block_var = NULL,
+                          unit_var = NULL,
                           seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
 
@@ -142,7 +152,8 @@ run_bootstrap <- function(run_one_rep, data, B, est,
 
     resample <- function() {
       drawn <- cluster_resample(unique_clusters, cluster_strata)
-      build_cluster_rep_data(data, cluster_var, cluster_ids, drawn)
+      build_cluster_rep_data(data, cluster_var, cluster_ids, drawn,
+                             unit_var = unit_var)
     }
     # build_cluster_rep_data already returns list(data = ..., orig_idx = ...)
   }

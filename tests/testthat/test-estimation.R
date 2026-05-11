@@ -22,8 +22,8 @@ test_that("wsga with IPW runs and balance tables are returned", {
                 running = ~ x, bwidth = 0.5,
                 noipsw = FALSE, bootstrap = FALSE)
   expect_false(is.null(fit$balance))
-  expect_false(is.null(fit$balance$weighted))
-  expect_named(fit$balance$unweighted$table,
+  expect_false(is.null(fit$balance$weighted$aggregate))
+  expect_named(fit$balance$unweighted$aggregate$table,
                c("mean_G0", "mean_G1", "std_diff", "p_value"))
 })
 
@@ -31,8 +31,8 @@ test_that("weighted balance reduces std_diff relative to unweighted", {
   fit <- wsga(y ~ m | sgroup, data = rddsga_synth,
                 running = ~ x, bwidth = 0.5,
                 noipsw = FALSE, bootstrap = FALSE)
-  expect_lt(fit$balance$weighted$avgdiff,
-            fit$balance$unweighted$avgdiff)
+  expect_lt(fit$balance$weighted$aggregate$avgdiff,
+            fit$balance$unweighted$aggregate$avgdiff)
 })
 
 test_that("coef(), vcov(), confint(), nobs() S3 methods work", {

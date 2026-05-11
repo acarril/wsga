@@ -14,7 +14,7 @@
 #' @return A list: `X` (design matrix), `y` (outcome), `coef_g0_name`,
 #'   `coef_g1_name`.
 #' @noRd
-build_design_matrix <- function(data, outcome, running, Z, G, covariates, p) {
+build_rdd_design_matrix <- function(data, outcome, running, Z, G, covariates, p) {
   n <- nrow(data)
   x <- data[[running]]
   y <- data[[outcome]]
@@ -200,4 +200,81 @@ extract_estimates <- function(model_result, df_resid = NULL, use_normal = FALSE)
     ci_diff = c(lb = b_diff - q * se_diff, ub = b_diff + q * se_diff),
     vcov_2x2 = V[c(g0, g1), c(g0, g1)]
   )
+}
+
+
+#' Build design matrix for subgroup DiD regression (long-form TWFE).
+#'
+#' Encodes:
+#'   Y_it = sum_i alpha_i I(unit=i)
+#'        + gamma_0 * post_t * (1 - G_i) + gamma_1 * post_t * G_i
+#'        + delta_0 * D_i * post_t * (1 - G_i)
+#'        + delta_1 * D_i * post_t * G_i
+#'        + sum_k beta_{0k} X_{kt} * (1 - G_i)
+#'        + sum_k beta_{1k} X_{kt} * G_i
+#'        + eps_it
+#'
+#' Coefficients of interest are `delta_0` and `delta_1`, exposed under the
+#' same `G0_Z` / `G1_Z` names used in the RDD design matrix so that
+#' downstream `run_model()` / `extract_estimates()` need no changes.
+#'
+#' @param data Data frame in long format (one row per unit-time).
+#' @param outcome Character: outcome variable name.
+#' @param unit Character: unit identifier column. Used to construct unit FE.
+#' @param time Character: time variable column.
+#' @param post_value Scalar: value of `time` denoting the post period.
+#' @param treat Character: treatment-group indicator (constant within unit;
+#'   0/1).
+#' @param G Integer 0/1 vector: subgroup indicator (constant within unit).
+#' @param covariates Character vector of covariate names. Time-invariant
+#'   covariates will be perfectly collinear with the unit FE and dropped by
+#'   `lm()` (a NA coefficient); harmless for the coefficients of interest.
+#' @return A list: `X`, `y`, `coef_g0_name`, `coef_g1_name`.
+#' @noRd
+build_did_design_matrix <- function(data, outcome, unit, time, post_value,
+                                    treat, G, covariates) {
+  n <- nrow(data)
+  y <- data[[outcome]]
+  G0 <- as.integer(G == 0)
+  G1 <- as.integer(G == 1)
+  D  <- data[[treat]]
+  post <- as.integer(data[[time]] == post_value)
+
+  # Treatment-effect coefficients (delta_0 = G0_Z, delta_1 = G1_Z)
+  G0_DP <- G0 * D * post
+  G1_DP <- G1 * D * post
+
+  # Time-by-subgroup interactions (gamma_0, gamma_1 in 2-period DiD)
+  G0_post <- G0 * post
+  G1_post <- G1 * post
+
+  # Unit fixed effects: one column per unit.  `as.factor` orders the
+  # levels lexicographically; column names are `unit_<level>`.
+  unit_factor <- as.factor(data[[unit]])
+  unit_fe_mat <- stats::model.matrix(~ unit_factor - 1)
+  colnames(unit_fe_mat) <- paste0("unit_", levels(unit_factor))
+
+  # Covariates × G (same convention as RDD)
+  cov_cols  <- list()
+  cov_names <- character(0)
+  for (v in covariates) {
+    cv <- data[[v]]
+    vn <- make.names(v)
+    cov_cols  <- c(cov_cols, list(G0 * cv, G1 * cv))
+    cov_names <- c(cov_names, paste0("G0_", vn), paste0("G1_", vn))
+  }
+
+  X <- cbind(
+    G0_Z    = G0_DP,
+    G1_Z    = G1_DP,
+    G0_post = G0_post,
+    G1_post = G1_post,
+    do.call(cbind, if (length(cov_cols) > 0) cov_cols
+                   else list(matrix(nrow = n, ncol = 0))),
+    unit_fe_mat
+  )
+  colnames(X) <- c("G0_Z", "G1_Z", "G0_post", "G1_post",
+                   cov_names, colnames(unit_fe_mat))
+
+  list(X = X, y = y, coef_g0_name = "G0_Z", coef_g1_name = "G1_Z")
 }
