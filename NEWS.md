@@ -1,5 +1,16 @@
 # wsga (R package) NEWS
 
+## wsga 0.8.0 (2026-05-11)
+
+### Breaking changes
+
+- `wsga()` is **removed**. Replace all calls with `wsga_rdd()` (RD designs) or
+  `wsga_did()` (DiD designs). Each function accepts only the arguments relevant
+  to its design; the `design =` argument no longer exists.
+- `rddsga()` (deprecated alias) now forwards to `wsga_rdd()`.
+
+---
+
 ## wsga 0.7.0 (2026-05-11)
 
 ### New features
@@ -20,13 +31,13 @@
 
 ### Package rename (from rddsga)
 
-- Package renamed `rddsga` → `wsga`. The old function `rddsga()` is retained as a deprecated alias forwarded to `wsga()`. Plan to remove in v2.
+- Package renamed `rddsga` → `wsga`. The old function `rddsga()` was retained as a deprecated alias (now forwards to `wsga_rdd()`). Plan to remove in v2.
 
 ---
 
 ## rddsga 0.3.0 → wsga 0.6.x (internal milestones)
 
-- Umbrella refactor: single `wsga()` entry point dispatching both RD and (now) DiD paths.
+- Umbrella refactor: single `wsga()` entry point dispatching both RD and DiD paths (replaced by `wsga_rdd()` / `wsga_did()` in 0.8.0).
 - S3 methods: `print`, `summary`, `coef`, `vcov`, `confint`, `nobs`.
 - `block_var` stratification for the bootstrap.
 - `seed` argument for reproducible bootstrap draws.

@@ -3,40 +3,22 @@
 #' @importFrom Formula Formula
 NULL
 
-#' Weighted Subgroup Analysis
+#' Weighted Subgroup Analysis for Regression Discontinuity Designs
 #'
-#' Estimates per-subgroup treatment effects and their difference using
-#' inverse probability weighting (IPW) to balance observed moderators across
-#' subgroups. Two designs are supported:
-#' - **Regression discontinuity** (`design = "rdd"`, default): sharp and
-#'   fuzzy RD, local polynomial regression with kernel weights.
-#' - **Difference-in-differences** (`design = "did"`): sharp 2-period DiD
-#'   with long-form TWFE (unit + time fixed effects, fully interacted by
-#'   subgroup).
+#' Estimates per-subgroup treatment effects and their difference in a sharp or
+#' fuzzy regression discontinuity (RD) design, using inverse probability
+#' weighting (IPW) to balance observed moderators across subgroups.
 #'
 #' @param formula A two-part `Formula` of the form
 #'   `outcome ~ covariates | subgroup`. The left of `|` contains covariates
 #'   included in the outcome regression; the right of `|` is the binary (0/1)
 #'   subgroup indicator. If there are no covariates, write `outcome ~ 1 | subgroup`.
-#' @param data A data frame. For `design = "did"`, in long format (one row
-#'   per unit-time).
-#' @param design Character: `"rdd"` (default) or `"did"`.
+#' @param data A data frame.
 #' @param running A one-sided formula (e.g. `~ score`) or a character string
-#'   naming the running variable column in `data`. Required when
-#'   `design = "rdd"`.
-#' @param cutoff Numeric cutoff value (`design = "rdd"`). The running
-#'   variable is internally centered: `x_c = running - cutoff`. Default `0`.
-#' @param bwidth Positive numeric half-bandwidth (`design = "rdd"`). Required.
-#' @param unit Character: name of the unit identifier column.
-#'   Required when `design = "did"`.
-#' @param time Character: name of the time variable column.
-#'   Required when `design = "did"`. Must have exactly 2 unique non-missing
-#'   values.
-#' @param treat Character: name of the binary (0/1) treatment-group indicator
-#'   (constant within unit). Required when `design = "did"`.
-#' @param post_value Optional value of `time` that denotes the post period.
-#'   Default: `max(time)` for numeric/Date columns, or the second factor
-#'   level otherwise.
+#'   naming the running variable column in `data`.
+#' @param cutoff Numeric cutoff value. The running variable is internally
+#'   centered: `x_c = running - cutoff`. Default `0`.
+#' @param bwidth Positive numeric half-bandwidth. Required.
 #' @param model Character: estimation model.
 #'   - `"rf"` (default): reduced form (sharp RD or reduced form of fuzzy RD).
 #'   - `"fs"`: first stage of fuzzy RD (outcome is the treatment indicator).
@@ -112,50 +94,222 @@ NULL
 #'   weights. These are multiplied into the kernel weights and (if `!noipsw`)
 #'   into the IPW weights.
 #'
-#' @return An S3 object of class `"wsga"` with the following elements:
-#' \describe{
-#'   \item{`coefficients`}{Named list `(g0, g1, diff)` of point estimates.}
-#'   \item{`se`}{Named list of standard errors. Bootstrap-based for
-#'     `inference` `"empirical"` or `"normal"`; sandwich/cluster-robust for
-#'     `"analytical"`.}
-#'   \item{`pval`}{Named list of two-sided p-values, computed according to
-#'     `inference`.}
-#'   \item{`ci`}{Named list of 95% confidence intervals, computed according to
-#'     `inference`.}
-#'   \item{`vcov`}{2×2 variance-covariance matrix for (g0, g1).}
-#'   \item{`bootstrap`}{List with `draws` (B×3 matrix), `vcov`, `pval`, `ci`,
-#'     `B_ok` (surviving reps), `failed` (dropped reps). `NULL` if
-#'     `bootstrap = FALSE`.}
-#'   \item{`inference`}{Character: the inference mode in effect.}
-#'   \item{`balance`}{List with `unweighted` and `weighted` balance table data
-#'     frames (each with global stats). `NULL` if no balance variables.}
-#'   \item{`pscore`}{Numeric vector of propensity scores (NA outside active
-#'     set). `NULL` if `noipsw = TRUE`.}
-#'   \item{`ipw_weights`}{Numeric vector of IPW weights. `NULL` if
-#'     `noipsw = TRUE`.}
-#'   \item{`kernel_weights`}{Numeric vector of kernel weights.}
-#'   \item{`model_fit`}{The underlying `lm` or `ivreg` object.}
-#'   \item{`call`}{The matched call.}
-#'   \item{`nobs`}{Named integer: `total`, `in_bw`, `G0`, `G1`.}
-#'   \item{`bwidth`, `cutoff`, `kernel`, `p`, `m`, `model`}{Configuration.}
-#' }
+#' @return An S3 object of class `"wsga"`. See [wsga_did()] for the full
+#'   description of return elements (identical structure).
 #'
 #' @examples
 #' data(rddsga_synth)
 #' # Sharp RD, no IPW
-#' fit <- wsga(y ~ 1 | sgroup, data = rddsga_synth,
-#'             running = ~ x, bwidth = 0.5, noipsw = TRUE,
-#'             bootstrap = FALSE)
+#' fit <- wsga_rdd(y ~ 1 | sgroup, data = rddsga_synth,
+#'                 running = ~ x, bwidth = 0.5, noipsw = TRUE,
+#'                 bootstrap = FALSE)
 #' print(fit)
 #'
 #' # Sharp RD with IPW balancing moderator m
-#' fit2 <- wsga(y ~ m | sgroup, data = rddsga_synth,
-#'              running = ~ x, bwidth = 0.5,
-#'              bootstrap = FALSE)
+#' fit2 <- wsga_rdd(y ~ m | sgroup, data = rddsga_synth,
+#'                  running = ~ x, bwidth = 0.5,
+#'                  bootstrap = FALSE)
 #' summary(fit2)
 #'
 #' @export
-wsga <- function(formula,
+wsga_rdd <- function(formula,
+                     data,
+                     running      = NULL,
+                     cutoff       = 0,
+                     bwidth       = NULL,
+                     model        = c("rf", "fs", "iv"),
+                     fuzzy        = NULL,
+                     p            = 1L,
+                     kernel       = c("uniform", "triangular", "epanechnikov"),
+                     balance      = NULL,
+                     ps_model     = c("logit", "probit"),
+                     noipsw       = FALSE,
+                     m            = 2L,
+                     comsup       = FALSE,
+                     show_balance = FALSE,
+                     rbalance     = 0L,
+                     bootstrap    = TRUE,
+                     bsreps       = 200L,
+                     inference    = NULL,
+                     block_var    = NULL,
+                     fixed_fs     = FALSE,
+                     fixed_ps     = FALSE,
+                     seed         = NULL,
+                     vce          = "HC1",
+                     cluster_var  = NULL,
+                     weights      = NULL) {
+  cl <- match.call()
+  out <- .wsga_impl(
+    formula      = formula,
+    data         = data,
+    design       = "rdd",
+    running      = running,
+    cutoff       = cutoff,
+    bwidth       = bwidth,
+    model        = model,
+    fuzzy        = fuzzy,
+    p            = p,
+    kernel       = kernel,
+    balance      = balance,
+    ps_model     = ps_model,
+    noipsw       = noipsw,
+    m            = m,
+    comsup       = comsup,
+    show_balance = show_balance,
+    rbalance     = rbalance,
+    bootstrap    = bootstrap,
+    bsreps       = bsreps,
+    inference    = inference,
+    block_var    = block_var,
+    fixed_fs     = fixed_fs,
+    fixed_ps     = fixed_ps,
+    seed         = seed,
+    vce          = vce,
+    cluster_var  = cluster_var,
+    weights      = weights
+  )
+  out$call <- cl
+  out
+}
+
+
+#' Weighted Subgroup Analysis for Difference-in-Differences Designs
+#'
+#' Estimates per-subgroup treatment effects and their difference in a sharp
+#' 2-period difference-in-differences (DiD) design, using inverse probability
+#' weighting (IPW) to balance observed moderators across subgroups. The
+#' estimator is a long-form TWFE regression (unit + time fixed effects) fully
+#' interacted by subgroup.
+#'
+#' @param formula A two-part `Formula` of the form
+#'   `outcome ~ covariates | subgroup`. The left of `|` contains covariates
+#'   included in the outcome regression; the right of `|` is the binary (0/1)
+#'   subgroup indicator. If there are no covariates, write `outcome ~ 1 | subgroup`.
+#' @param data A data frame in long format (one row per unit-time).
+#' @param unit Character: name of the unit identifier column.
+#' @param time Character: name of the time variable column. Must have exactly
+#'   2 unique non-missing values.
+#' @param treat Character: name of the binary (0/1) treatment-group indicator
+#'   (constant within unit).
+#' @param post_value Optional value of `time` that denotes the post period.
+#'   Default: `max(time)` for numeric/Date columns, or the second sorted value
+#'   otherwise.
+#' @param balance A one-sided formula (e.g. `~ m1 + m2`) specifying balance
+#'   variables for the propensity score model. Defaults to the covariates in
+#'   `formula` if not supplied.
+#' @param ps_model Propensity score model: `"logit"` (default) or `"probit"`.
+#' @param noipsw Logical. If `TRUE`, skips IPW entirely. Default `FALSE`.
+#' @param m Integer weighting mode when `noipsw = FALSE`:
+#'   - `2` (default): balance both groups toward the pooled distribution.
+#'   - `1`: balance group 1 toward group 0 distribution.
+#'   - `0`: balance group 0 toward group 1 distribution.
+#' @param comsup Logical. Restrict to common propensity score support?
+#'   Default `FALSE`.
+#' @param show_balance Logical. Print balance tables to the console?
+#'   Default `FALSE`.
+#' @param bootstrap Logical. Run the bootstrap loop? Default `TRUE`.
+#' @param bsreps Positive integer: number of bootstrap replications. Default `200`.
+#' @param inference Character. One of `"empirical"` (default with bootstrap),
+#'   `"normal"`, or `"analytical"` (default without bootstrap).
+#' @param block_var Character or `NULL`. Column name for stratified bootstrap
+#'   resampling (strata of clusters when `cluster_var` is set). Default `NULL`.
+#' @param fixed_ps Logical. Diagnostic flag; see [wsga_rdd()] for details.
+#'   Default `FALSE`.
+#' @param seed Integer or `NULL`. RNG seed for reproducibility. Default `NULL`.
+#' @param vce Character: sandwich SE type. Default `"cluster"` when
+#'   `cluster_var` is set, otherwise `"HC1"`.
+#' @param cluster_var Character or `NULL`. Column name defining clusters.
+#'   Defaults to `unit` (pairs-cluster bootstrap over panel units).
+#' @param weights Character or `NULL`. Column name of pre-existing observation
+#'   weights.
+#'
+#' @return An S3 object of class `"wsga"` with the following elements:
+#' \describe{
+#'   \item{`coefficients`}{Named list `(g0, g1, diff)` of point estimates.}
+#'   \item{`se`}{Named list of standard errors.}
+#'   \item{`pval`}{Named list of two-sided p-values.}
+#'   \item{`ci`}{Named list of 95% confidence intervals.}
+#'   \item{`vcov`}{2×2 variance-covariance matrix for (g0, g1).}
+#'   \item{`bootstrap`}{List with `draws` (B×3 matrix), `vcov`, `pval`, `ci`,
+#'     `B_ok`, `failed`. `NULL` if `bootstrap = FALSE`.}
+#'   \item{`inference`}{Character: the inference mode in effect.}
+#'   \item{`balance`}{List with `unweighted` and `weighted` balance tables.
+#'     `NULL` if no balance variables.}
+#'   \item{`pscore`}{Numeric vector of propensity scores. `NULL` if `noipsw`.}
+#'   \item{`ipw_weights`}{Numeric vector of IPW weights. `NULL` if `noipsw`.}
+#'   \item{`kernel_weights`}{Numeric vector of kernel weights.}
+#'   \item{`model_fit`}{The underlying `lm` object.}
+#'   \item{`call`}{The matched call.}
+#'   \item{`nobs`}{Named integer: `total`, `in_bw`, `G0`, `G1`.}
+#' }
+#'
+#' @examples
+#' data(wsga_did_synth)
+#' # Unweighted DiD subgroup analysis
+#' fit <- wsga_did(y ~ 1 | sgroup, data = wsga_did_synth,
+#'                 unit = "unit", time = "time", treat = "D",
+#'                 noipsw = TRUE, bootstrap = FALSE)
+#' print(fit)
+#'
+#' # IPW-weighted DiD
+#' fit2 <- wsga_did(y ~ m | sgroup, data = wsga_did_synth,
+#'                  unit = "unit", time = "time", treat = "D",
+#'                  bootstrap = FALSE)
+#' summary(fit2)
+#'
+#' @export
+wsga_did <- function(formula,
+                     data,
+                     unit         = NULL,
+                     time         = NULL,
+                     treat        = NULL,
+                     post_value   = NULL,
+                     balance      = NULL,
+                     ps_model     = c("logit", "probit"),
+                     noipsw       = FALSE,
+                     m            = 2L,
+                     comsup       = FALSE,
+                     show_balance = FALSE,
+                     bootstrap    = TRUE,
+                     bsreps       = 200L,
+                     inference    = NULL,
+                     block_var    = NULL,
+                     fixed_ps     = FALSE,
+                     seed         = NULL,
+                     vce          = "HC1",
+                     cluster_var  = NULL,
+                     weights      = NULL) {
+  cl <- match.call()
+  out <- .wsga_impl(
+    formula      = formula,
+    data         = data,
+    design       = "did",
+    unit         = unit,
+    time         = time,
+    treat        = treat,
+    post_value   = post_value,
+    balance      = balance,
+    ps_model     = ps_model,
+    noipsw       = noipsw,
+    m            = m,
+    comsup       = comsup,
+    show_balance = show_balance,
+    bootstrap    = bootstrap,
+    bsreps       = bsreps,
+    inference    = inference,
+    block_var    = block_var,
+    fixed_ps     = fixed_ps,
+    seed         = seed,
+    vce          = vce,
+    cluster_var  = cluster_var,
+    weights      = weights
+  )
+  out$call <- cl
+  out
+}
+
+
+.wsga_impl <- function(formula,
                    data,
                    design      = c("rdd", "did"),
                    running     = NULL,
@@ -186,8 +340,6 @@ wsga <- function(formula,
                    vce         = "HC1",
                    cluster_var = NULL,
                    weights     = NULL) {
-
-  cl <- match.call()
 
   # ── 1. Argument validation ──────────────────────────────────────────────────
   design   <- match.arg(design)
@@ -608,7 +760,7 @@ wsga <- function(formula,
       ipw_weights   = ipw,
       kernel_weights = kwt,
       model_fit     = model_result$fit,
-      call          = cl,
+      call          = NULL,
       nobs          = nobs,
       outcome       = outcome_name,
       design        = design,

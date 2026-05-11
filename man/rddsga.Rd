@@ -7,17 +7,17 @@
 rddsga(...)
 }
 \arguments{
-\item{...}{Arguments forwarded to \code{\link[=wsga]{wsga()}}.}
+\item{...}{Arguments forwarded to \code{\link[=wsga_rdd]{wsga_rdd()}}.}
 }
 \value{
-The return value of \code{\link[=wsga]{wsga()}}.
+The return value of \code{\link[=wsga_rdd]{wsga_rdd()}}.
 }
 \description{
-\code{rddsga()} is the previous name of \code{wsga()}. It is retained as a deprecated
-alias and will be removed in a future major release. New code should call
-\code{wsga()} directly.
+\code{rddsga()} is the previous name of \code{wsga_rdd()}. It is retained as a
+deprecated alias and will be removed in a future major release. New code
+should call \code{wsga_rdd()} directly.
 }
 \seealso{
-\code{\link[=wsga]{wsga()}}
+\code{\link[=wsga_rdd]{wsga_rdd()}}
 }
 \keyword{internal}

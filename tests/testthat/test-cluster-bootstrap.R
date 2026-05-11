@@ -11,7 +11,7 @@ make_clustered <- function(n_clusters = 50L, seed = 1L) {
 
 test_that("cluster bootstrap exposes N_clusters and uses pairs-cluster path", {
   d <- make_clustered(n_clusters = 50L)
-  fit <- wsga(y ~ 1 | sgroup, data = d, running = ~ x, bwidth = 0.5,
+  fit <- wsga_rdd(y ~ 1 | sgroup, data = d, running = ~ x, bwidth = 0.5,
               noipsw = TRUE, bootstrap = TRUE, bsreps = 20, seed = 1,
               cluster_var = "school")
   expect_true("N_clusters" %in% names(fit$bootstrap))
@@ -20,9 +20,9 @@ test_that("cluster bootstrap exposes N_clusters and uses pairs-cluster path", {
 })
 
 test_that("row-level bootstrap (cluster_var = NULL) does not expose N_clusters", {
-  fit <- wsga(y ~ 1 | sgroup, data = rddsga_synth,
-              running = ~ x, bwidth = 0.5,
-              noipsw = TRUE, bootstrap = TRUE, bsreps = 20, seed = 1)
+  fit <- wsga_rdd(y ~ 1 | sgroup, data = rddsga_synth,
+                 running = ~ x, bwidth = 0.5,
+                 noipsw = TRUE, bootstrap = TRUE, bsreps = 20, seed = 1)
   expect_false("N_clusters" %in% names(fit$bootstrap))
   expect_null(fit$cluster_var_name)
 })
@@ -61,9 +61,9 @@ test_that("block_var must be constant within cluster_var", {
   # Make block_var vary within school -> should error.
   d$bad <- sample(c("east", "west"), nrow(d), replace = TRUE)
   expect_error(
-    wsga(y ~ 1 | sgroup, data = d, running = ~ x, bwidth = 0.5,
-         noipsw = TRUE, bootstrap = TRUE, bsreps = 5, seed = 1,
-         cluster_var = "school", block_var = "bad"),
+    wsga_rdd(y ~ 1 | sgroup, data = d, running = ~ x, bwidth = 0.5,
+             noipsw = TRUE, bootstrap = TRUE, bsreps = 5, seed = 1,
+             cluster_var = "school", block_var = "bad"),
     "must be constant within `cluster_var`"
   )
 })
@@ -71,7 +71,7 @@ test_that("block_var must be constant within cluster_var", {
 test_that("block_var constant within cluster works", {
   d <- make_clustered(n_clusters = 50L)
   d$region <- ifelse(d$school <= 25, "east", "west")
-  fit <- wsga(y ~ 1 | sgroup, data = d, running = ~ x, bwidth = 0.5,
+  fit <- wsga_rdd(y ~ 1 | sgroup, data = d, running = ~ x, bwidth = 0.5,
               noipsw = TRUE, bootstrap = TRUE, bsreps = 20, seed = 1,
               cluster_var = "school", block_var = "region")
   expect_equal(fit$bootstrap$N_clusters, 50L)
@@ -81,20 +81,20 @@ test_that("block_var constant within cluster works", {
 test_that("few-clusters (<30) emits the SE-understatement warning", {
   d <- make_clustered(n_clusters = 12L, seed = 2L)
   expect_warning(
-    wsga(y ~ 1 | sgroup, data = d, running = ~ x, bwidth = 0.5,
-         noipsw = TRUE, bootstrap = TRUE, bsreps = 5, seed = 1,
-         cluster_var = "school"),
+    wsga_rdd(y ~ 1 | sgroup, data = d, running = ~ x, bwidth = 0.5,
+             noipsw = TRUE, bootstrap = TRUE, bsreps = 5, seed = 1,
+             cluster_var = "school"),
     "12 clusters"
   )
 })
 
 test_that("seed makes cluster bootstrap reproducible", {
   d <- make_clustered(n_clusters = 50L)
-  fit_a <- wsga(y ~ 1 | sgroup, data = d, running = ~ x, bwidth = 0.5,
-                noipsw = TRUE, bootstrap = TRUE, bsreps = 20, seed = 42,
-                cluster_var = "school")
-  fit_b <- wsga(y ~ 1 | sgroup, data = d, running = ~ x, bwidth = 0.5,
-                noipsw = TRUE, bootstrap = TRUE, bsreps = 20, seed = 42,
-                cluster_var = "school")
+  fit_a <- wsga_rdd(y ~ 1 | sgroup, data = d, running = ~ x, bwidth = 0.5,
+                   noipsw = TRUE, bootstrap = TRUE, bsreps = 20, seed = 42,
+                   cluster_var = "school")
+  fit_b <- wsga_rdd(y ~ 1 | sgroup, data = d, running = ~ x, bwidth = 0.5,
+                   noipsw = TRUE, bootstrap = TRUE, bsreps = 20, seed = 42,
+                   cluster_var = "school")
   expect_equal(fit_a$bootstrap$draws, fit_b$bootstrap$draws)
 })

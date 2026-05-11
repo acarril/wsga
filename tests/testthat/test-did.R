@@ -18,7 +18,7 @@ make_did_panel <- function(n_units = 200L, seed = 1L) {
 test_that("DiD design errors when required args are missing", {
   d <- make_did_panel()
   expect_error(
-    wsga(y ~ 1 | sgroup, data = d, design = "did"),
+    wsga_did(y ~ 1 | sgroup, data = d),
     "requires `unit`, `time`, and `treat`"
   )
 })
@@ -27,8 +27,8 @@ test_that("DiD requires exactly 2 unique time values", {
   d <- make_did_panel()
   d$time[1] <- 99L  # introduces a third time value
   expect_error(
-    wsga(y ~ 1 | sgroup, data = d, design = "did",
-         unit = "unit", time = "time", treat = "D", bootstrap = FALSE),
+    wsga_did(y ~ 1 | sgroup, data = d,
+             unit = "unit", time = "time", treat = "D", bootstrap = FALSE),
     "exactly 2 unique"
   )
 })
@@ -37,8 +37,8 @@ test_that("DiD errors when `treat` varies within unit", {
   d <- make_did_panel()
   d$D[d$unit == 1L][1] <- 1L - d$D[d$unit == 1L][1]  # flip one observation
   expect_error(
-    wsga(y ~ 1 | sgroup, data = d, design = "did",
-         unit = "unit", time = "time", treat = "D", bootstrap = FALSE),
+    wsga_did(y ~ 1 | sgroup, data = d,
+             unit = "unit", time = "time", treat = "D", bootstrap = FALSE),
     "varies within unit"
   )
 })
@@ -47,27 +47,20 @@ test_that("DiD errors when `sgroup` varies within unit", {
   d <- make_did_panel()
   d$sgroup[d$unit == 1L][1] <- 1L - d$sgroup[d$unit == 1L][1]
   expect_error(
-    wsga(y ~ 1 | sgroup, data = d, design = "did",
-         unit = "unit", time = "time", treat = "D", bootstrap = FALSE),
+    wsga_did(y ~ 1 | sgroup, data = d,
+             unit = "unit", time = "time", treat = "D", bootstrap = FALSE),
     "varies within unit"
   )
 })
 
-test_that("DiD rejects fuzzy / IV models with a paper-citing message", {
-  d <- make_did_panel()
-  expect_error(
-    wsga(y ~ 1 | sgroup, data = d, design = "did",
-         unit = "unit", time = "time", treat = "D",
-         model = "iv", fuzzy = ~ D, bootstrap = FALSE),
-    "Fuzzy DiD is not currently supported"
-  )
-})
+# wsga_did() does not expose a `model` argument: fuzzy DiD is impossible
+# by construction (the function signature excludes it).
 
 test_that("DiD recovers per-subgroup treatment effects on the synthetic panel", {
   d <- make_did_panel(n_units = 600L, seed = 2L)
-  fit <- wsga(y ~ 1 | sgroup, data = d, design = "did",
-              unit = "unit", time = "time", treat = "D",
-              noipsw = TRUE, bootstrap = FALSE)
+  fit <- wsga_did(y ~ 1 | sgroup, data = d,
+                  unit = "unit", time = "time", treat = "D",
+                  noipsw = TRUE, bootstrap = FALSE)
   # True effects: tau_0 = 1, tau_1 = 3
   expect_equal(fit$coefficients$g0, 1, tolerance = 0.25)
   expect_equal(fit$coefficients$g1, 3, tolerance = 0.25)
@@ -76,9 +69,9 @@ test_that("DiD recovers per-subgroup treatment effects on the synthetic panel", 
 
 test_that("DiD output records design + unit/time/treat names + post_value", {
   d <- make_did_panel()
-  fit <- wsga(y ~ 1 | sgroup, data = d, design = "did",
-              unit = "unit", time = "time", treat = "D",
-              noipsw = TRUE, bootstrap = FALSE)
+  fit <- wsga_did(y ~ 1 | sgroup, data = d,
+                  unit = "unit", time = "time", treat = "D",
+                  noipsw = TRUE, bootstrap = FALSE)
   expect_equal(fit$design, "did")
   expect_equal(fit$unit_name, "unit")
   expect_equal(fit$time_name, "time")
@@ -88,18 +81,18 @@ test_that("DiD output records design + unit/time/treat names + post_value", {
 
 test_that("DiD cluster_var defaults to unit when bootstrap is on", {
   d <- make_did_panel(n_units = 60L, seed = 3L)
-  fit <- wsga(y ~ 1 | sgroup, data = d, design = "did",
-              unit = "unit", time = "time", treat = "D",
-              noipsw = TRUE, bootstrap = TRUE, bsreps = 20, seed = 1)
+  fit <- wsga_did(y ~ 1 | sgroup, data = d,
+                  unit = "unit", time = "time", treat = "D",
+                  noipsw = TRUE, bootstrap = TRUE, bsreps = 20, seed = 1)
   expect_equal(fit$cluster_var_name, "unit")
   expect_equal(fit$bootstrap$N_clusters, 60L)
 })
 
 test_that("DiD bootstrap with IPW runs and produces positive SEs", {
   d <- make_did_panel(n_units = 100L, seed = 4L)
-  fit <- wsga(y ~ m | sgroup, data = d, design = "did",
-              unit = "unit", time = "time", treat = "D",
-              bootstrap = TRUE, bsreps = 20, seed = 5)
+  fit <- wsga_did(y ~ m | sgroup, data = d,
+                  unit = "unit", time = "time", treat = "D",
+                  bootstrap = TRUE, bsreps = 20, seed = 5)
   expect_gt(fit$se$g0, 0)
   expect_gt(fit$se$g1, 0)
   expect_gt(fit$se$diff, 0)
@@ -108,9 +101,9 @@ test_that("DiD bootstrap with IPW runs and produces positive SEs", {
 test_that("DiD produces aggregate AND treated-only balance tables; RDD only aggregate", {
   # DiD path
   d <- make_did_panel(n_units = 200L, seed = 6L)
-  fit_did <- wsga(y ~ m | sgroup, data = d, design = "did",
-                  unit = "unit", time = "time", treat = "D",
-                  bootstrap = FALSE)
+  fit_did <- wsga_did(y ~ m | sgroup, data = d,
+                      unit = "unit", time = "time", treat = "D",
+                      bootstrap = FALSE)
   expect_false(is.null(fit_did$balance$unweighted$aggregate))
   expect_false(is.null(fit_did$balance$unweighted$treated))
   expect_false(is.null(fit_did$balance$weighted$aggregate))
@@ -118,8 +111,8 @@ test_that("DiD produces aggregate AND treated-only balance tables; RDD only aggr
 
   # RDD path (using existing example data)
   data(rddsga_synth)
-  fit_rdd <- wsga(y ~ m | sgroup, data = rddsga_synth,
-                  running = ~ x, bwidth = 0.5, bootstrap = FALSE)
+  fit_rdd <- wsga_rdd(y ~ m | sgroup, data = rddsga_synth,
+                      running = ~ x, bwidth = 0.5, bootstrap = FALSE)
   expect_false(is.null(fit_rdd$balance$unweighted$aggregate))
   expect_null(fit_rdd$balance$unweighted$treated)
   expect_false(is.null(fit_rdd$balance$weighted$aggregate))
@@ -128,17 +121,17 @@ test_that("DiD produces aggregate AND treated-only balance tables; RDD only aggr
 
 test_that("DiD with post_value override picks the right period", {
   d <- make_did_panel()
-  fit <- wsga(y ~ 1 | sgroup, data = d, design = "did",
-              unit = "unit", time = "time", treat = "D",
-              post_value = 1L,
-              noipsw = TRUE, bootstrap = FALSE)
+  fit <- wsga_did(y ~ 1 | sgroup, data = d,
+                  unit = "unit", time = "time", treat = "D",
+                  post_value = 1L,
+                  noipsw = TRUE, bootstrap = FALSE)
   expect_equal(fit$post_value, 1L)
 
   expect_error(
-    wsga(y ~ 1 | sgroup, data = d, design = "did",
-         unit = "unit", time = "time", treat = "D",
-         post_value = 99L,
-         noipsw = TRUE, bootstrap = FALSE),
+    wsga_did(y ~ 1 | sgroup, data = d,
+             unit = "unit", time = "time", treat = "D",
+             post_value = 99L,
+             noipsw = TRUE, bootstrap = FALSE),
     "not in the unique values of `time`"
   )
 })

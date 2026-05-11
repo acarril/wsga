@@ -13,7 +13,7 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 
 ## Overview
 
-`wsga` implements weighted subgroup analysis for research designs that require control variables for identification. Currently it covers regression discontinuity (RD) designs; sharp difference-in-differences (DiD) is planned. The key idea is that when subgroups differ in observed characteristics, a raw comparison of subgroup-specific treatment effects conflates the causal effect of the subgroup with the effect of correlated moderators. Inverse probability weighting (IPW) rebalances observed moderators across subgroups, isolating the subgroup-attributable component of the treatment effect difference.
+`wsga` implements weighted subgroup analysis for research designs that require control variables for identification. It covers regression discontinuity (RD) designs via `wsga_rdd()` and sharp difference-in-differences (DiD) designs via `wsga_did()`. The key idea is that when subgroups differ in observed characteristics, a raw comparison of subgroup-specific treatment effects conflates the causal effect of the subgroup with the effect of correlated moderators. Inverse probability weighting (IPW) rebalances observed moderators across subgroups, isolating the subgroup-attributable component of the treatment effect difference.
 
 ## Installation
 
@@ -38,7 +38,7 @@ str(rddsga_synth)
 ### Step 1: Unweighted subgroup analysis
 
 ```{r noipsw, cache = TRUE}
-fit_unw <- wsga(
+fit_unw <- wsga_rdd(
   y ~ 1 | sgroup,          # outcome ~ covariates | subgroup
   data      = rddsga_synth,
   running   = ~ x,
@@ -54,7 +54,7 @@ print(fit_unw)
 Include the moderator `m` so the propensity score model can balance it.
 
 ```{r ipsw, cache = TRUE}
-fit_ipsw <- wsga(
+fit_ipsw <- wsga_rdd(
   y ~ m | sgroup,
   data      = rddsga_synth,
   running   = ~ x,
@@ -70,7 +70,7 @@ across subgroups at the cutoff.
 ### Step 3: Adding bootstrap inference
 
 ```{r bootstrap, cache = TRUE}
-fit_boot <- wsga(
+fit_boot <- wsga_rdd(
   y ~ m | sgroup,
   data      = rddsga_synth,
   running   = ~ x,
@@ -87,7 +87,7 @@ The dataset includes a fuzzy treatment `D` with ~80% compliance above the
 cutoff. Use `model = "iv"` to obtain 2SLS estimates.
 
 ```{r fuzzy, cache = TRUE}
-fit_iv <- wsga(
+fit_iv <- wsga_rdd(
   y ~ m | sgroup,
   data      = rddsga_synth,
   running   = ~ x,
