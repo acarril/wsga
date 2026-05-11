@@ -90,5 +90,5 @@ run_bootstrap <- function(run_one_rep, data, B, est,
   rownames(ci) <- c("lb", "ub")
 
   list(draws = draws_ok, vcov = V_boot, pval = pval, ci = ci,
-       B_ok = B_ok)
+       B_ok = B_ok, failed = sum(!ok))
 }

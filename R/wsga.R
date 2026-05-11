@@ -48,9 +48,19 @@ NULL
 #' @param rbalance Integer. How to compute conditional means for the balance
 #'   table: `0` = mean at the cutoff (local linear extrapolation, default),
 #'   `1` = mean in the full bandwidth sample.
-#' @param bootstrap Logical. Compute bootstrap standard errors and empirical
-#'   CIs/p-values? Default `TRUE`.
-#' @param bsreps Positive integer: number of bootstrap replications. Default `50`.
+#' @param bootstrap Logical. Run the bootstrap loop (refits the full pipeline
+#'   per replicate)? Default `TRUE`.
+#' @param bsreps Positive integer: number of bootstrap replications. Default `200`.
+#' @param inference Character. How standard errors, CIs, and p-values are
+#'   computed and reported. One of:
+#'   - `"empirical"`: bootstrap SE; empirical (percentile) CIs at 2.5/97.5;
+#'     `(1 + count)/(B + 1)` p-values. Requires `bootstrap = TRUE`. **Default
+#'     when `bootstrap = TRUE`.**
+#'   - `"normal"`: bootstrap SE; normal-approximation CIs `b ± z·SE` and
+#'     p-values `2·(1 − Φ(|t|))`. Requires `bootstrap = TRUE`.
+#'   - `"analytical"`: sandwich (or cluster-robust) SE; CIs and p-values from
+#'     the t distribution with the regression residual df. Requires
+#'     `bootstrap = FALSE`. **Default when `bootstrap = FALSE`.**
 #' @param block_var Character or `NULL`. Column name for stratified (block)
 #'   bootstrap resampling. Default `NULL` (unstratified).
 #' @param fixed_fs Logical. Fixed first-stage bootstrap for IV: bootstrap the
@@ -69,14 +79,18 @@ NULL
 #' @return An S3 object of class `"wsga"` with the following elements:
 #' \describe{
 #'   \item{`coefficients`}{Named list `(g0, g1, diff)` of point estimates.}
-#'   \item{`se`}{Named list of standard errors (from bootstrap vcov if
-#'     `bootstrap = TRUE`, else sandwich).}
-#'   \item{`pval`}{Named list of two-sided p-values.}
-#'   \item{`ci`}{Named list of 95% confidence intervals (empirical if bootstrap,
-#'     else normal-approximation).}
+#'   \item{`se`}{Named list of standard errors. Bootstrap-based for
+#'     `inference` `"empirical"` or `"normal"`; sandwich/cluster-robust for
+#'     `"analytical"`.}
+#'   \item{`pval`}{Named list of two-sided p-values, computed according to
+#'     `inference`.}
+#'   \item{`ci`}{Named list of 95% confidence intervals, computed according to
+#'     `inference`.}
 #'   \item{`vcov`}{2×2 variance-covariance matrix for (g0, g1).}
-#'   \item{`bootstrap`}{List with `draws` (B×2 matrix), `vcov`, `pval`, `ci`
-#'     from bootstrap. `NULL` if `bootstrap = FALSE`.}
+#'   \item{`bootstrap`}{List with `draws` (B×3 matrix), `vcov`, `pval`, `ci`,
+#'     `B_ok` (surviving reps), `failed` (dropped reps). `NULL` if
+#'     `bootstrap = FALSE`.}
+#'   \item{`inference`}{Character: the inference mode in effect.}
 #'   \item{`balance`}{List with `unweighted` and `weighted` balance table data
 #'     frames (each with global stats). `NULL` if no balance variables.}
 #'   \item{`pscore`}{Numeric vector of propensity scores (NA outside active
@@ -122,7 +136,8 @@ wsga <- function(formula,
                    show_balance = FALSE,
                    rbalance    = 0L,
                    bootstrap   = TRUE,
-                   bsreps      = 50L,
+                   bsreps      = 200L,
+                   inference   = NULL,
                    block_var   = NULL,
                    fixed_fs    = FALSE,
                    seed        = NULL,
@@ -144,6 +159,17 @@ wsga <- function(formula,
     stop("`fuzzy` must be specified when model = '", model, "'.")
   if (!is.data.frame(data))
     stop("`data` must be a data frame.")
+
+  # Resolve `inference`. Three modes; default depends on `bootstrap`.
+  inference <- if (is.null(inference)) {
+    if (bootstrap) "empirical" else "analytical"
+  } else {
+    match.arg(inference, c("empirical", "normal", "analytical"))
+  }
+  if (bootstrap && inference == "analytical")
+    stop("`inference = 'analytical'` requires `bootstrap = FALSE` (analytical SEs do not use the bootstrap loop).")
+  if (!bootstrap && inference %in% c("empirical", "normal"))
+    stop(sprintf("`inference = '%s'` requires `bootstrap = TRUE`.", inference))
 
   # ── 2. Parse formula ────────────────────────────────────────────────────────
   fml <- Formula::Formula(formula)
@@ -363,27 +389,38 @@ wsga <- function(formula,
     boot_result <- run_bootstrap(run_one_rep, data, bsreps, point_est,
                                  block_var = block_var, seed = seed)
 
-    # Override SEs and inference with bootstrap quantities
+    # SE and t-statistics always come from the bootstrap when it runs.
     V_boot  <- boot_result$vcov
     se_g0_b <- sqrt(V_boot[1, 1])
     se_g1_b <- sqrt(V_boot[2, 2])
     cov_b   <- V_boot[1, 2]
     se_diff_b <- sqrt(se_g0_b^2 + se_g1_b^2 - 2 * cov_b)
 
-    t_g0_b    <- est$b_g0    / se_g0_b
-    t_g1_b    <- est$b_g1    / se_g1_b
-    t_diff_b  <- est$b_diff  / se_diff_b
+    t_g0_b   <- est$b_g0   / se_g0_b
+    t_g1_b   <- est$b_g1   / se_g1_b
+    t_diff_b <- est$b_diff / se_diff_b
 
-    est$se_g0    <- se_g0_b;   est$se_g1    <- se_g1_b
-    est$se_diff  <- se_diff_b
-    est$t_g0     <- t_g0_b;    est$t_g1     <- t_g1_b;  est$t_diff <- t_diff_b
-    est$p_g0    <- boot_result$pval[["g0"]]
-    est$p_g1    <- boot_result$pval[["g1"]]
-    est$p_diff  <- boot_result$pval[["diff"]]
-    est$ci_g0   <- c(lb = boot_result$ci["lb", "g0"],   ub = boot_result$ci["ub", "g0"])
-    est$ci_g1   <- c(lb = boot_result$ci["lb", "g1"],   ub = boot_result$ci["ub", "g1"])
-    est$ci_diff <- c(lb = boot_result$ci["lb", "diff"],  ub = boot_result$ci["ub", "diff"])
+    est$se_g0 <- se_g0_b; est$se_g1 <- se_g1_b; est$se_diff <- se_diff_b
+    est$t_g0  <- t_g0_b;  est$t_g1  <- t_g1_b;  est$t_diff  <- t_diff_b
     est$vcov_2x2 <- V_boot
+
+    # CIs and p-values: branch on inference mode.
+    if (inference == "empirical") {
+      est$p_g0   <- boot_result$pval[["g0"]]
+      est$p_g1   <- boot_result$pval[["g1"]]
+      est$p_diff <- boot_result$pval[["diff"]]
+      est$ci_g0   <- c(lb = boot_result$ci["lb", "g0"],   ub = boot_result$ci["ub", "g0"])
+      est$ci_g1   <- c(lb = boot_result$ci["lb", "g1"],   ub = boot_result$ci["ub", "g1"])
+      est$ci_diff <- c(lb = boot_result$ci["lb", "diff"], ub = boot_result$ci["ub", "diff"])
+    } else {  # inference == "normal"
+      z <- qnorm(0.975)
+      est$p_g0   <- 2 * (1 - pnorm(abs(t_g0_b)))
+      est$p_g1   <- 2 * (1 - pnorm(abs(t_g1_b)))
+      est$p_diff <- 2 * (1 - pnorm(abs(t_diff_b)))
+      est$ci_g0   <- c(lb = est$b_g0   - z * se_g0_b,   ub = est$b_g0   + z * se_g0_b)
+      est$ci_g1   <- c(lb = est$b_g1   - z * se_g1_b,   ub = est$b_g1   + z * se_g1_b)
+      est$ci_diff <- c(lb = est$b_diff - z * se_diff_b, ub = est$b_diff + z * se_diff_b)
+    }
   }
 
   # ── 10. Assemble output ──────────────────────────────────────────────────────
@@ -419,7 +456,8 @@ wsga <- function(formula,
       p             = p,
       m             = m,
       model         = model,
-      noipsw        = noipsw
+      noipsw        = noipsw,
+      inference     = inference
     ),
     class = "wsga"
   )
@@ -496,14 +534,18 @@ coerce_obs_wt <- function(obs_weights, n) {
 #' @export
 print.wsga <- function(x, ...) {
   use_boot <- !is.null(x$bootstrap)
-  ci_label  <- if (use_boot) "[95% CI (emp.)]" else "[95% CI (norm.)]"
-  z_label   <- if (use_boot) "z" else "t"
+  ci_label <- switch(x$inference,
+                     empirical  = "[95% CI (emp.)]",
+                     normal     = "[95% CI (norm., boot)]",
+                     analytical = "[95% CI (norm.)]")
+  z_label  <- if (x$inference == "analytical") "t" else "z"
+  p_label  <- if (x$inference == "analytical") "P>|t|" else "P>|z|"
 
   cat(sprintf("\nRD subgroup analysis  |  model: %s  |  bwidth: %g  |  kernel: %s\n\n",
               x$model, x$bwidth, x$kernel))
 
   hdr <- sprintf("%-12s | %9s  %9s  %6s  %7s  %s\n",
-                 x$outcome, "Coef.", "Std. Err.", z_label, "P>|z|", ci_label)
+                 x$outcome, "Coef.", "Std. Err.", z_label, p_label, ci_label)
   sep <- paste0(strrep("-", 13), "+", strrep("-", 64), "\n")
 
   cat(sep)
