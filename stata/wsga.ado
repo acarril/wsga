@@ -1258,20 +1258,69 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     local g1_covs "`g1_covs' `g1_`v''"
   }
 
-  // ── Warnings for not-yet-supported features (will be added in follow-up PRs)
+  // ── IPW: fit logit/probit on (G, balance) and compute weights.
+  // Because G and the moderators are unit-constant (validated above), fitting
+  // on the long panel produces unit-constant pscore values — the per-row
+  // values are correct as-is and no broadcast is required.
+  tempvar pscore_var ipw_var
+  qui gen double `pscore_var' = .
+  qui gen double `ipw_var'    = 1
+
   if "`ipsw'" != "noipsw" & `: list sizeof balance' > 0 {
-    di as text ///
-"Note: IPW reweighting in DiD mode is not yet implemented in this Stata build. Falling back to unweighted DiD-SGA (equivalent to specifying {bf:noipsw})."
+    if "`probit'" != "" {
+      qui probit `sgroup' `balance' if `touse'
+    }
+    else {
+      qui logit `sgroup' `balance' if `touse'
+    }
+    qui predict double _wsga_ps if `touse', pr
+    qui replace `pscore_var' = _wsga_ps
+    qui drop _wsga_ps
+
+    // Unit-level counts for normalization (count one row per unit)
+    tempvar unit_first
+    qui by `unit' (`touse'), sort: gen byte `unit_first' = (_n == 1) & `touse'
+    qui count if `unit_first' & `sgroup' == 0 & !mi(`pscore_var')
+    local N_G0 = r(N)
+    qui count if `unit_first' & `sgroup' == 1 & !mi(`pscore_var')
+    local N_G1 = r(N)
+    local N_tot = `N_G0' + `N_G1'
+
+    // m=2: balance both groups toward pooled (the default and paper-preferred)
+    // m=1: balance group 1 toward group 0  (ATT for G=0)
+    // m=0: balance group 0 toward group 1  (ATT for G=1)
+    qui replace `ipw_var' = .
+    if `m' == 2 {
+      qui replace `ipw_var' = (`N_G1' / `N_tot') / `pscore_var'         if `sgroup' == 1 & !mi(`pscore_var')
+      qui replace `ipw_var' = (`N_G0' / `N_tot') / (1 - `pscore_var')   if `sgroup' == 0 & !mi(`pscore_var')
+    }
+    else if `m' == 1 {
+      qui replace `ipw_var' = (1 - `pscore_var') / `pscore_var'         if `sgroup' == 1 & !mi(`pscore_var')
+      qui replace `ipw_var' = 1                                          if `sgroup' == 0
+    }
+    else if `m' == 0 {
+      qui replace `ipw_var' = `pscore_var' / (1 - `pscore_var')          if `sgroup' == 0 & !mi(`pscore_var')
+      qui replace `ipw_var' = 1                                          if `sgroup' == 1
+    }
+    else {
+      di as error "m() must be 0, 1, or 2 (got `m')."
+      exit 198
+    }
+    // Replace NAs in ipw with 0 so they drop out of the regression
+    qui replace `ipw_var' = 0 if mi(`ipw_var')
   }
+
   if "`bootstrap'" != "nobootstrap" {
     di as text ///
 "Note: bootstrap inference in DiD mode is not yet implemented in this Stata build. Analytical cluster-robust SEs are reported instead."
   }
 
-  // ── Estimate: long-form TWFE with unit FE absorbed via xtreg, fe
+  // ── Estimate: long-form TWFE with unit FE absorbed via xtreg, fe.
+  // Weights enter as pweights so SE machinery is consistent with sampling-
+  // weight semantics.  When noipsw / no balance, ipw_var is identically 1.
   qui xtset `unit'
   local rhs `G0_Z' `G1_Z' `G0_post' `G1_post' `g0_covs' `g1_covs'
-  xtreg `depvar' `rhs' if `touse', fe vce(cluster `unit')
+  xtreg `depvar' `rhs' [pw=`ipw_var'] if `touse' & `ipw_var' > 0, fe vce(cluster `unit')
 
   // ── Extract coefficients of interest
   scalar b_g0   = _b[`G0_Z']
