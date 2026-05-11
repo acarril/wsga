@@ -1,0 +1,20 @@
+R/estimation.R
+  s_4cb00f9b578a6e::t_dd2c92216c025a 88-93,99,104
+  s_4cb00f9b578a6e::t_848c22c264032f 169-172
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.6",
+  "base_commit_sha": "cd6e0323ad75d9026298fb6627e3ff97a2c21443",
+  "prompts": {},
+  "sessions": {
+    "s_4cb00f9b578a6e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "25e699ac-6a44-4a2e-8c22-4a4c2456b65f",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
