@@ -1,0 +1,33 @@
+R/bootstrap.R
+  s_4cb00f9b578a6e::t_5b58302cf0756b 69-71,73-82,85-90,92-93,96-98,101-143,148,157-166,171-172,183-186
+  s_4cb00f9b578a6e::t_499f5217f60efe 1,20-62
+tests/testthat/test-cluster-bootstrap.R
+  s_4cb00f9b578a6e::t_9583a981637bad 1-95
+man/wsga.Rd
+  s_4cb00f9b578a6e::t_7399c74d2fa050 111-115
+  s_4cb00f9b578a6e::t_edc71e2bb5c0d0 127-135
+R/wsga.R
+  s_4cb00f9b578a6e::t_0803f0cb4890e2 482-483
+  s_4cb00f9b578a6e::t_e1194782d9e1d7 592-601
+  s_4cb00f9b578a6e::t_1241c2e0c9ddbb 64-68
+  s_4cb00f9b578a6e::t_bcca2aae3a9a69 399-409,411
+  s_4cb00f9b578a6e::t_d65923d5762519 76-84
+DESCRIPTION
+  s_4cb00f9b578a6e::t_eb719b976de7ea 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.5",
+  "base_commit_sha": "02b02ee729be798a9d35a55e5048a08dd4f2a593",
+  "prompts": {},
+  "sessions": {
+    "s_4cb00f9b578a6e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "25e699ac-6a44-4a2e-8c22-4a4c2456b65f",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
