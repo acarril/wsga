@@ -1,6 +1,4 @@
-# wsga
-
-**Weighted Subgroup Analysis**
+# `wsga` — Weighted Subgroup Analysis
 
 Implements inverse probability weighted (IPW) subgroup analysis for research designs that require control variables for identification. When subgroups differ in observed moderators, a naive comparison of subgroup-specific treatment effects conflates the causal effect of the subgroup characteristic with the effect of correlated moderators. Reweighting observations via IPW balances observed moderators across subgroups, isolating the subgroup-attributable component of the treatment effect difference.
 
