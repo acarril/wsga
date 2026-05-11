@@ -89,7 +89,7 @@ See `?wsga`, `vignette("wsga-intro")`, and `vignette("wsga-did-intro")` for full
 
 ## Reference
 
-Carril, Alvaro, Andre Cazor, Maria Paula Gerardino, Stephan Litschig, and Dina Pomeranz. "Weighted Subgroup Analysis in Regression Discontinuity Designs." Working paper.
+Carril, Alvaro, Andre Cazor, Maria Paula Gerardino, Stephan Litschig, and Dina Pomeranz. "Weighted Subgroup Analysis". Working paper.
 
 ## Issues
 
