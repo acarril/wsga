@@ -48,19 +48,26 @@ cluster_resample <- function(unique_clusters, cluster_strata = NULL) {
 #' @param cluster_var Character: name of the cluster column.
 #' @param cluster_ids The cluster column values, length nrow(data).
 #' @param drawn Drawn cluster IDs (output of `cluster_resample`).
-#' @return A data frame with N_drawn × (rows-per-cluster) rows.
+#' @return A list with two elements:
+#'   - `data`: data frame with `length(drawn) × rows-per-cluster` rows.
+#'   - `orig_idx`: integer vector of the same length, where
+#'     `orig_idx[k]` is the row in the original `data` that the k-th
+#'     row of the resampled data came from. Used by the `fixed_ps`
+#'     code path to look up the original-sample propensity score.
 #' @noRd
 build_cluster_rep_data <- function(data, cluster_var, cluster_ids, drawn) {
-  parts <- vector("list", length(drawn))
+  parts          <- vector("list", length(drawn))
+  orig_idx_parts <- vector("list", length(drawn))
   for (j in seq_along(drawn)) {
     rows <- which(cluster_ids == drawn[j])
     sub <- data[rows, , drop = FALSE]
     sub[[cluster_var]] <- paste0(as.character(drawn[j]), "__d", j)
-    parts[[j]] <- sub
+    parts[[j]]          <- sub
+    orig_idx_parts[[j]] <- rows
   }
   out <- do.call(rbind, parts)
   rownames(out) <- NULL
-  out
+  list(data = out, orig_idx = unlist(orig_idx_parts))
 }
 
 
@@ -104,7 +111,7 @@ run_bootstrap <- function(run_one_rep, data, B, est,
     strata <- if (!is.null(block_var)) data[[block_var]] else NULL
     resample <- function() {
       idx <- stratified_resample(n, strata)
-      data[idx, , drop = FALSE]
+      list(data = data[idx, , drop = FALSE], orig_idx = idx)
     }
     N_clusters <- NULL
   } else {
@@ -137,6 +144,7 @@ run_bootstrap <- function(run_one_rep, data, B, est,
       drawn <- cluster_resample(unique_clusters, cluster_strata)
       build_cluster_rep_data(data, cluster_var, cluster_ids, drawn)
     }
+    # build_cluster_rep_data already returns list(data = ..., orig_idx = ...)
   }
 
   draws <- matrix(NA_real_, nrow = B, ncol = 2,
@@ -144,8 +152,9 @@ run_bootstrap <- function(run_one_rep, data, B, est,
 
   message(sprintf("Bootstrap replications (%d):", B))
   for (i in seq_len(B)) {
+    r <- resample()
     tryCatch({
-      draws[i, ] <- run_one_rep(resample())
+      draws[i, ] <- run_one_rep(r$data, r$orig_idx)
     }, error = function(e) {
       # leave row as NA; warn once at end
     })

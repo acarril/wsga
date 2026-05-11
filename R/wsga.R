@@ -69,6 +69,16 @@ NULL
 #' @param fixed_fs Logical. Fixed first-stage bootstrap for IV: bootstrap the
 #'   reduced form and divide by the point-estimate first-stage coefficients.
 #'   Default `FALSE`.
+#' @param fixed_ps Logical. Diagnostic flag. When `TRUE`, the propensity score
+#'   model is **not** refit inside the bootstrap loop; instead, each
+#'   resampled row inherits the propensity score (and common-support
+#'   membership) from its original-sample row. This isolates the
+#'   variance contribution of the outcome model from that of the
+#'   weight-estimation step. **It understates the SE relative to the
+#'   paper's intended interpretation**, which is why the default is
+#'   `FALSE`. Useful for sanity-checking and for fast iteration on the
+#'   outcome specification when the PS fit is expensive. No effect when
+#'   `noipsw = TRUE` or when there are no balance variables.
 #' @param seed Integer or `NULL`. RNG seed for reproducibility. Default `NULL`.
 #' @param vce Character: heteroskedasticity-consistent SE type passed to
 #'   `sandwich::vcovHC`. Common choices: `"HC1"` (default), `"HC0"`, `"HC2"`,
@@ -150,6 +160,7 @@ wsga <- function(formula,
                    inference   = NULL,
                    block_var   = NULL,
                    fixed_fs    = FALSE,
+                   fixed_ps    = FALSE,
                    seed        = NULL,
                    vce         = "HC1",
                    cluster_var = NULL,
@@ -393,7 +404,10 @@ wsga <- function(formula,
       vce              = vce,
       cluster_var_name = cluster_var,
       fixed_fs         = fixed_fs,
-      fs_coefs         = fs_coefs
+      fs_coefs         = fs_coefs,
+      fixed_ps            = fixed_ps,
+      original_pscore     = pscore,
+      original_comsup_idx = comsup_idx
     )
 
     # Few-clusters advisory when clustering is active
@@ -480,7 +494,8 @@ wsga <- function(formula,
       model         = model,
       noipsw        = noipsw,
       inference     = inference,
-      cluster_var_name = if (is.null(cluster_var)) NULL else cluster_var
+      cluster_var_name = if (is.null(cluster_var)) NULL else cluster_var,
+      fixed_ps      = fixed_ps
     ),
     class = "wsga"
   )
@@ -493,8 +508,11 @@ make_boot_rep <- function(outcome_name, running_name, cutoff, bwidth,
                           obs_wt_name, obs_weights_vec,
                           kernel, noipsw, ps_model, comsup, m,
                           model, fuzzy_name, p, vce, cluster_var_name,
-                          fixed_fs, fs_coefs) {
-  function(data_b) {
+                          fixed_fs, fs_coefs,
+                          fixed_ps = FALSE,
+                          original_pscore = NULL,
+                          original_comsup_idx = NULL) {
+  function(data_b, orig_idx) {
     x_b  <- data_b[[running_name]] - cutoff
     G_b  <- data_b[[G_name]]
     y_b  <- data_b[[outcome_name]]
@@ -507,9 +525,19 @@ make_boot_rep <- function(outcome_name, running_name, cutoff, bwidth,
     kwt_b <- kernel_weights(x_b, bwidth, kernel, obs_wt_b)
 
     if (!noipsw && length(balance_names) > 0) {
-      bal_b   <- data_b[, balance_names, drop = FALSE]
-      ps_b    <- compute_pscore(G_b, bal_b, within_b, touse_b,
+      if (fixed_ps) {
+        # Look up original-sample propensity score and common-support mask
+        # via the orig_idx mapping (each resampled row carries its original
+        # row index).
+        ps_b <- list(
+          pscore     = original_pscore[orig_idx],
+          comsup_idx = original_comsup_idx[orig_idx]
+        )
+      } else {
+        bal_b <- data_b[, balance_names, drop = FALSE]
+        ps_b  <- compute_pscore(G_b, bal_b, within_b, touse_b,
                                 obs_wt_b, ps_model, comsup)
+      }
       ipw_b   <- compute_ipw_weights(G_b, ps_b$pscore, within_b, touse_b,
                                      ps_b$comsup_idx, m, obs_wt_b)
       fw_b    <- ipw_b$ipw * kwt_b
@@ -590,13 +618,14 @@ print.wsga <- function(x, ...) {
   cat(sep)
 
   if (use_boot) {
+    ps_tag <- if (isTRUE(x$fixed_ps)) " [PS fixed]" else ""
     if (!is.null(x$bootstrap$N_clusters)) {
       total_reps <- x$bootstrap$B_ok + x$bootstrap$failed
-      cat(sprintf("Cluster bootstrap: %d/%d reps, clustered on '%s' (%d clusters)\n",
+      cat(sprintf("Cluster bootstrap: %d/%d reps, clustered on '%s' (%d clusters)%s\n",
                   x$bootstrap$B_ok, total_reps,
-                  x$cluster_var_name, x$bootstrap$N_clusters))
+                  x$cluster_var_name, x$bootstrap$N_clusters, ps_tag))
     } else {
-      cat(sprintf("Bootstrap replications: %d\n", x$bootstrap$B_ok))
+      cat(sprintf("Bootstrap replications: %d%s\n", x$bootstrap$B_ok, ps_tag))
     }
   }
 
