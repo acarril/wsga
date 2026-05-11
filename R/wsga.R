@@ -61,8 +61,11 @@ NULL
 #'   - `"analytical"`: sandwich (or cluster-robust) SE; CIs and p-values from
 #'     the t distribution with the regression residual df. Requires
 #'     `bootstrap = FALSE`. **Default when `bootstrap = FALSE`.**
-#' @param block_var Character or `NULL`. Column name for stratified (block)
-#'   bootstrap resampling. Default `NULL` (unstratified).
+#' @param block_var Character or `NULL`. Column name for stratified bootstrap
+#'   resampling. Default `NULL` (unstratified). Semantics adapt to
+#'   `cluster_var`: when `cluster_var` is `NULL`, `block_var` defines strata
+#'   of rows; when `cluster_var` is set, it defines strata of clusters and
+#'   must be constant within each cluster (validated at runtime).
 #' @param fixed_fs Logical. Fixed first-stage bootstrap for IV: bootstrap the
 #'   reduced form and divide by the point-estimate first-stage coefficients.
 #'   Default `FALSE`.
@@ -70,8 +73,15 @@ NULL
 #' @param vce Character: heteroskedasticity-consistent SE type passed to
 #'   `sandwich::vcovHC`. Common choices: `"HC1"` (default), `"HC0"`, `"HC2"`,
 #'   `"HC3"`. Use `"cluster"` together with `cluster_var` for cluster-robust SEs.
-#' @param cluster_var Character or `NULL`. Column name for cluster-robust SEs
-#'   (`vce = "cluster"` must also be set).
+#' @param cluster_var Character or `NULL`. Column name defining clusters.
+#'   Drives two things: when `bootstrap = TRUE`, switches the bootstrap from
+#'   row-level to pairs cluster (whole clusters are resampled with
+#'   replacement; cluster IDs are made unique per draw so unit fixed effects
+#'   remain identified — the Cameron–Gelbach–Miller recipe). When
+#'   `inference = "analytical"`, also requires `vce = "cluster"` to deliver
+#'   the cluster-robust sandwich SE. With fewer than ~30 unique clusters, a
+#'   one-time warning is emitted about likely SE understatement; see
+#'   `fwildclusterboot::boottest` for a wild-cluster alternative.
 #' @param weights Character or `NULL`. Column name of pre-existing observation
 #'   weights. These are multiplied into the kernel weights and (if `!noipsw`)
 #'   into the IPW weights.
@@ -386,7 +396,19 @@ wsga <- function(formula,
       fs_coefs         = fs_coefs
     )
 
+    # Few-clusters advisory when clustering is active
+    if (!is.null(cluster_var)) {
+      n_clust <- length(unique(data[[cluster_var]][!is.na(data[[cluster_var]])]))
+      if (n_clust < 30L) {
+        warning(sprintf(
+          "Cluster bootstrap with %d clusters. With fewer than ~30 clusters, pairs-cluster bootstrap can substantially understate standard errors. Consider also reporting analytical cluster-robust SEs (set `bootstrap = FALSE`, `vce = \"cluster\"`) and/or a wild cluster bootstrap-t (not implemented; see fwildclusterboot::boottest in R or boottest in Stata).",
+          n_clust
+        ))
+      }
+    }
+
     boot_result <- run_bootstrap(run_one_rep, data, bsreps, point_est,
+                                 cluster_var = cluster_var,
                                  block_var = block_var, seed = seed)
 
     # SE and t-statistics always come from the bootstrap when it runs.
@@ -457,7 +479,8 @@ wsga <- function(formula,
       m             = m,
       model         = model,
       noipsw        = noipsw,
-      inference     = inference
+      inference     = inference,
+      cluster_var_name = if (is.null(cluster_var)) NULL else cluster_var
     ),
     class = "wsga"
   )
@@ -566,8 +589,16 @@ print.wsga <- function(x, ...) {
               x$tstat$diff, x$pval$diff, x$ci$diff))
   cat(sep)
 
-  if (use_boot)
-    cat(sprintf("Bootstrap replications: %d\n", x$bootstrap$B_ok))
+  if (use_boot) {
+    if (!is.null(x$bootstrap$N_clusters)) {
+      total_reps <- x$bootstrap$B_ok + x$bootstrap$failed
+      cat(sprintf("Cluster bootstrap: %d/%d reps, clustered on '%s' (%d clusters)\n",
+                  x$bootstrap$B_ok, total_reps,
+                  x$cluster_var_name, x$bootstrap$N_clusters))
+    } else {
+      cat(sprintf("Bootstrap replications: %d\n", x$bootstrap$B_ok))
+    }
+  }
 
   cat(sprintf("N (G=0): %d   N (G=1): %d\n", x$nobs[["G0"]], x$nobs[["G1"]]))
   invisible(x)

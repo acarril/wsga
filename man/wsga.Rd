@@ -108,8 +108,11 @@ the t distribution with the regression residual df. Requires
 \code{bootstrap = FALSE}. \strong{Default when \code{bootstrap = FALSE}.}
 }}
 
-\item{block_var}{Character or \code{NULL}. Column name for stratified (block)
-bootstrap resampling. Default \code{NULL} (unstratified).}
+\item{block_var}{Character or \code{NULL}. Column name for stratified bootstrap
+resampling. Default \code{NULL} (unstratified). Semantics adapt to
+\code{cluster_var}: when \code{cluster_var} is \code{NULL}, \code{block_var} defines strata
+of rows; when \code{cluster_var} is set, it defines strata of clusters and
+must be constant within each cluster (validated at runtime).}
 
 \item{fixed_fs}{Logical. Fixed first-stage bootstrap for IV: bootstrap the
 reduced form and divide by the point-estimate first-stage coefficients.
@@ -121,8 +124,15 @@ Default \code{FALSE}.}
 \code{sandwich::vcovHC}. Common choices: \code{"HC1"} (default), \code{"HC0"}, \code{"HC2"},
 \code{"HC3"}. Use \code{"cluster"} together with \code{cluster_var} for cluster-robust SEs.}
 
-\item{cluster_var}{Character or \code{NULL}. Column name for cluster-robust SEs
-(\code{vce = "cluster"} must also be set).}
+\item{cluster_var}{Character or \code{NULL}. Column name defining clusters.
+Drives two things: when \code{bootstrap = TRUE}, switches the bootstrap from
+row-level to pairs cluster (whole clusters are resampled with
+replacement; cluster IDs are made unique per draw so unit fixed effects
+remain identified — the Cameron–Gelbach–Miller recipe). When
+\code{inference = "analytical"}, also requires \code{vce = "cluster"} to deliver
+the cluster-robust sandwich SE. With fewer than ~30 unique clusters, a
+one-time warning is emitted about likely SE understatement; see
+\code{fwildclusterboot::boottest} for a wild-cluster alternative.}
 
 \item{weights}{Character or \code{NULL}. Column name of pre-existing observation
 weights. These are multiplied into the kernel weights and (if \code{!noipsw})
