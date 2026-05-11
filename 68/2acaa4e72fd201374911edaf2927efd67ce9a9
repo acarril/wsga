@@ -1,0 +1,69 @@
+tests/testthat/test-inference.R
+  s_3d70de12de023b::t_184e5f6f34d443 4,16,24,73
+  s_3d70de12de023b::t_0f07b15aa80b1a 41
+  s_3d70de12de023b::t_e53022de644b62 37
+  s_3d70de12de023b::t_70371c6c8c9355 53-55,59-61,65-67
+tests/testthat/test-deprecated.R
+  s_3d70de12de023b::t_767facd7fc1d5d 3,10-12
+tests/testthat/test-did.R
+  s_3d70de12de023b::t_bb1b30e625d31a 21,30-31,40-41,50-51,61-63,72-74,84-86,93-95,104-106,114-115,124-127,131-134
+  s_3d70de12de023b::t_ab03868c844b46 56-57
+R/wsga.R
+  s_3d70de12de023b::t_e2eb8eba71a215 763
+  s_3d70de12de023b::t_5e660a9b0569ae 6,8-10,16,18-21,97-225,229-231,234,236-239,241,247-251,254-257,261-312
+vignettes/wsga-intro.Rmd
+  s_3d70de12de023b::t_65d93f939a01ca 41,57,73,90
+  s_3d70de12de023b::t_84e6713707b78b 16
+DESCRIPTION
+  s_3d70de12de023b::t_dbb45fec2aa2a9 3
+tests/testthat/test-fixed-ps.R
+  s_3d70de12de023b::t_aef68748797783 4
+  s_3d70de12de023b::t_c8d4503fb9a257 11,24
+  s_3d70de12de023b::t_0b8368c34888fd 20
+  s_3d70de12de023b::t_2241a4906d2de3 53-56,62-65
+  s_3d70de12de023b::t_c583cecfdac561 38-45
+tests/testthat/test-bootstrap.R
+  s_3d70de12de023b::t_7591186df54ed6 4,14,23,32,41,58
+  s_3d70de12de023b::t_9f3c9b7e5fdbd9 70
+  s_3d70de12de023b::t_9d28c8c1ef947b 67
+NAMESPACE
+  s_3d70de12de023b::t_e3fdc218c6475a 10-11
+tests/testthat/test-cluster-bootstrap.R
+  s_3d70de12de023b::t_fc8fa1bd098f99 93-98
+  s_3d70de12de023b::t_34b92746e1a9d0 14,74
+  s_3d70de12de023b::t_d7c7fab1490d2e 84-86
+  s_3d70de12de023b::t_66b41774428013 23-25
+  s_3d70de12de023b::t_c6c690be7f5688 64-66
+NEWS.md
+  s_3d70de12de023b::t_6d0e5ca6a0c428 3-13
+  s_3d70de12de023b::t_b4e70ca6789ec8 40
+man/wsga_rdd.Rd
+  s_3d70de12de023b::t_e3fdc218c6475a 1-176
+R/deprecated.R
+  s_3d70de12de023b::t_7fb44dbda796d0 3-5,7-9,13-14
+man/wsga_did.Rd
+  s_3d70de12de023b::t_e3fdc218c6475a 1-138
+man/rddsga.Rd
+  s_3d70de12de023b::t_e3fdc218c6475a 10,13,16-18,21
+vignettes/wsga-did-intro.Rmd
+  s_3d70de12de023b::t_fd08ead695db24 48,70,88-89,92
+tests/testthat/test-estimation.R
+  s_3d70de12de023b::t_6f33a025335940 3
+  s_3d70de12de023b::t_fa1ea5e8887a33 4-6,12-14,20-23,31-33,39-41,50-52,57-59,64-67,70-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.6",
+  "base_commit_sha": "682acaa4e72fd201374911edaf2927efd67ce9a9",
+  "prompts": {},
+  "sessions": {
+    "s_3d70de12de023b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2026509-7611-4e8a-b21f-eb39014f2512",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
