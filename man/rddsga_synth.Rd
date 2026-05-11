@@ -3,7 +3,7 @@
 \docType{data}
 \name{rddsga_synth}
 \alias{rddsga_synth}
-\title{Synthetic dataset for rddsga examples}
+\title{Synthetic RDD dataset for wsga examples}
 \format{
 A data frame with 2,000 rows and 6 columns:
 \describe{

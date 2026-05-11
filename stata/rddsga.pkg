@@ -1,31 +1,35 @@
-v 1.0.0
-d 'RDDSGA': Subgroup analysis for regression discontinuity designs using inverse 
-d  propensity score weighting
+v 1.2.0
+d 'RDDSGA': Deprecated alias for the wsga package
 d
-d  rddsga allows to conduct a binary subgroup analysis in RDD settings
-d  based on inverse propensity score weights (IPSW). Observations in each  
-d  subgroup are weighted by the inverse of their conditional probabilities to  
-d  belong to that subgroup, given a set of covariates. Analyzing the 
-d  differential treatment effect in the reweighted sample helps solating the
-d  difference due to the subgroup characteristic of interest from other 
-d  observable dimensions.
-d  
-d KW: RDD
-d KW: Regression Discontinuity
+d  rddsga is the previous name of the wsga (Weighted Subgroup Analysis)
+d  package. It is retained as a deprecated alias so existing replication
+d  code that calls `ssc install rddsga` or `net install rddsga` continues
+d  to work. Installing this package installs the same files as installing
+d  `wsga`. The rddsga command is itself a deprecated alias of wsga; both
+d  commands are installed.
+d
+d  New code and new install scripts should target wsga directly.
+d
+d KW: Weighted subgroup analysis
 d KW: Subgroup analysis
-d 
-d Requires: Stata version 11 
+d KW: Regression discontinuity
+d KW: RDD
+d KW: IPW
 d
-d Distribution-Date: 20171019
+d Requires: Stata version 11
 d
-d Authors: Alvaro Carril, J-PAL LAC
-d          Andre Cazor, J-PAL LAC
+d Distribution-Date: 20260509
+d
+d Authors: Alvaro Carril
+d          Andre Cazor, PUC Chile
 d          Maria Paula Gerardino, Inter-American Development Bank
 d          Stephan Litschig, National Graduate Institute for Policy Studies
 d          Dina Pomeranz, University of Zurich
 d
-d Support: email acarril@fen.uchile.cl
+d Support: report issues at https://github.com/acarril/wsga/issues
 d
+F wsga.ado
+F wsga.sthlp
 F rddsga.ado
 F rddsga.sthlp
 f rddsga_synth.dta

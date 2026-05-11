@@ -1,6 +1,6 @@
 #' Compute balance table and global balance statistics
 #'
-#' Mirrors the `balancematrix` subroutine in `rddsga.ado`. Can be called for
+#' Mirrors the `balancematrix` subroutine in `wsga.ado`. Can be called for
 #' both the unweighted and IPW-weighted cases.
 #'
 #' @param balance_vars Character vector of balance variable names.

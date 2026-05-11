@@ -1,4 +1,4 @@
-#' Synthetic dataset for rddsga examples
+#' Synthetic RDD dataset for wsga examples
 #'
 #' A simulated dataset with 2,000 observations designed to illustrate
 #' weighted subgroup analysis in a regression discontinuity setting. The

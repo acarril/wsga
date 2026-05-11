@@ -66,7 +66,7 @@ NULL
 #'   weights. These are multiplied into the kernel weights and (if `!noipsw`)
 #'   into the IPW weights.
 #'
-#' @return An S3 object of class `"rddsga"` with the following elements:
+#' @return An S3 object of class `"wsga"` with the following elements:
 #' \describe{
 #'   \item{`coefficients`}{Named list `(g0, g1, diff)` of point estimates.}
 #'   \item{`se`}{Named list of standard errors (from bootstrap vcov if
@@ -93,19 +93,19 @@ NULL
 #' @examples
 #' data(rddsga_synth)
 #' # Sharp RD, no IPW
-#' fit <- rddsga(y ~ 1 | sgroup, data = rddsga_synth,
-#'               running = ~ x, bwidth = 0.5, noipsw = TRUE,
-#'               bootstrap = FALSE)
+#' fit <- wsga(y ~ 1 | sgroup, data = rddsga_synth,
+#'             running = ~ x, bwidth = 0.5, noipsw = TRUE,
+#'             bootstrap = FALSE)
 #' print(fit)
 #'
 #' # Sharp RD with IPW balancing moderator m
-#' fit2 <- rddsga(y ~ m | sgroup, data = rddsga_synth,
-#'                running = ~ x, bwidth = 0.5,
-#'                bootstrap = FALSE)
+#' fit2 <- wsga(y ~ m | sgroup, data = rddsga_synth,
+#'              running = ~ x, bwidth = 0.5,
+#'              bootstrap = FALSE)
 #' summary(fit2)
 #'
 #' @export
-rddsga <- function(formula,
+wsga <- function(formula,
                    data,
                    running,
                    cutoff      = 0,
@@ -291,12 +291,12 @@ rddsga <- function(formula,
   outcome_for_model <- if (model == "fs") fuzzy_name else outcome_name
 
   # Temporarily replace the outcome column if needed
-  data$.rddsga_x <- x   # centered running variable
+  data$.wsga_x <- x   # centered running variable
 
   dm <- build_design_matrix(
     data       = data,
     outcome    = outcome_for_model,
-    running    = ".rddsga_x",
+    running    = ".wsga_x",
     Z          = Z,
     G          = G,
     covariates = covariate_names,
@@ -311,7 +311,7 @@ rddsga <- function(formula,
   fs_coefs <- NULL
   if (model == "iv" && fixed_fs) {
     dm_fs <- build_design_matrix(
-      data = data, outcome = fuzzy_name, running = ".rddsga_x",
+      data = data, outcome = fuzzy_name, running = ".wsga_x",
       Z = Z, G = G, covariates = covariate_names, p = p
     )
     fs_fit <- run_model(dm_fs, final_wt, active, model = "rf",
@@ -387,7 +387,7 @@ rddsga <- function(formula,
   }
 
   # ── 10. Assemble output ──────────────────────────────────────────────────────
-  data$.rddsga_x <- NULL  # clean up
+  data$.wsga_x <- NULL  # clean up
 
   nobs <- c(
     total = sum(touse),
@@ -421,7 +421,7 @@ rddsga <- function(formula,
       model         = model,
       noipsw        = noipsw
     ),
-    class = "rddsga"
+    class = "wsga"
   )
 }
 
@@ -458,11 +458,11 @@ make_boot_rep <- function(outcome_name, running_name, cutoff, bwidth,
     }
 
     active_b <- touse_b & within_b & fw_b > 0
-    data_b$.rddsga_x <- x_b
+    data_b$.wsga_x <- x_b
 
     if (model == "iv" && fixed_fs) {
       # Bootstrap reduced form and divide by saved FS coefficients
-      dm_b <- build_design_matrix(data_b, fuzzy_name, ".rddsga_x",
+      dm_b <- build_design_matrix(data_b, fuzzy_name, ".wsga_x",
                                   Z_b, G_b, covariate_names, p)
       res_b <- run_model(dm_b, fw_b, active_b, "rf", vce = vce)
       bc    <- coef(res_b$fit)
@@ -474,7 +474,7 @@ make_boot_rep <- function(outcome_name, running_name, cutoff, bwidth,
 
     outcome_b  <- if (model == "fs") fuzzy_name else outcome_name
     fuzzy_b    <- if (model == "iv") list(D = data_b[[fuzzy_name]], G = G_b, Z = Z_b) else NULL
-    dm_b       <- build_design_matrix(data_b, outcome_b, ".rddsga_x",
+    dm_b       <- build_design_matrix(data_b, outcome_b, ".wsga_x",
                                       Z_b, G_b, covariate_names, p)
     clust_b    <- if (!is.null(cluster_var_name)) data_b[[cluster_var_name]] else NULL
     res_b      <- run_model(dm_b, fw_b, active_b, model,
@@ -494,7 +494,7 @@ coerce_obs_wt <- function(obs_weights, n) {
 # ── S3 methods ────────────────────────────────────────────────────────────────
 
 #' @export
-print.rddsga <- function(x, ...) {
+print.wsga <- function(x, ...) {
   use_boot <- !is.null(x$bootstrap)
   ci_label  <- if (use_boot) "[95% CI (emp.)]" else "[95% CI (norm.)]"
   z_label   <- if (use_boot) "z" else "t"
@@ -533,7 +533,7 @@ print.rddsga <- function(x, ...) {
 
 
 #' @export
-summary.rddsga <- function(object, ...) {
+summary.wsga <- function(object, ...) {
   print(object, ...)
 
   if (!is.null(object$balance)) {
@@ -559,7 +559,7 @@ summary.rddsga <- function(object, ...) {
 
 
 #' @export
-coef.rddsga <- function(object, ...) {
+coef.wsga <- function(object, ...) {
   c(g0 = object$coefficients$g0,
     g1 = object$coefficients$g1,
     diff = object$coefficients$diff)
@@ -567,11 +567,11 @@ coef.rddsga <- function(object, ...) {
 
 
 #' @export
-vcov.rddsga <- function(object, ...) object$vcov
+vcov.wsga <- function(object, ...) object$vcov
 
 
 #' @export
-confint.rddsga <- function(object, parm = NULL, level = 0.95, ...) {
+confint.wsga <- function(object, parm = NULL, level = 0.95, ...) {
   ci <- rbind(
     g0   = object$ci$g0,
     g1   = object$ci$g1,
@@ -584,4 +584,4 @@ confint.rddsga <- function(object, parm = NULL, level = 0.95, ...) {
 
 
 #' @export
-nobs.rddsga <- function(object, ...) object$nobs[["in_bw"]]
+nobs.wsga <- function(object, ...) object$nobs[["in_bw"]]

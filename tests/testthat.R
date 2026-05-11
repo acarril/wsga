@@ -7,6 +7,6 @@
 # * https://testthat.r-lib.org/articles/special-files.html
 
 library(testthat)
-library(rddsga)
+library(wsga)
 
-test_check("rddsga")
+test_check("wsga")

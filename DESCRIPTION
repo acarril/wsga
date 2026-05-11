@@ -1,16 +1,17 @@
-Package: rddsga
-Title: Weighted Subgroup Analysis in Regression Discontinuity Designs
-Version: 0.2.0
+Package: wsga
+Title: Weighted Subgroup Analysis
+Version: 0.3.0
 Authors@R:
     person("Alvaro", "Carril", email = "alvarocarril@gmail.com", role = c("aut", "cre"))
 Description: Implements inverse probability weighted (IPW) subgroup analysis for
-    regression discontinuity (RD) designs. Fits a propensity score model for
-    subgroup membership within the bandwidth, constructs IPW weights so that
-    observed moderators are balanced across subgroups at the cutoff, and
-    estimates per-subgroup RD effects and their difference via weighted local
-    polynomial regression. Supports sharp and fuzzy RD designs, three kernel
-    types, polynomial order selection, multiple weighting modes, common support
-    trimming, and bootstrap inference (standard, block, and fixed first-stage).
+    research designs that require control variables for identification. Fits a
+    propensity score model for subgroup membership, constructs IPW weights so
+    that observed moderators are balanced across subgroups, and estimates
+    per-subgroup treatment effects and their difference via weighted regression.
+    Currently supports sharp and fuzzy regression discontinuity designs; sharp
+    difference-in-differences support is planned. Includes three kernel types,
+    polynomial order selection, multiple weighting modes, common support
+    trimming, and bootstrap inference (standard, stratified, fixed first-stage).
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -27,5 +28,5 @@ Suggests:
     rmarkdown
 Config/testthat/edition: 3
 VignetteBuilder: knitr
-URL: https://github.com/acarril/rddsga
-BugReports: https://github.com/acarril/rddsga/issues
+URL: https://github.com/acarril/wsga
+BugReports: https://github.com/acarril/wsga/issues

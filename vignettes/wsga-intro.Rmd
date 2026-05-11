@@ -1,8 +1,8 @@
 ---
-title: "Introduction to rddsga"
+title: "Introduction to wsga"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Introduction to rddsga}
+  %\VignetteIndexEntry{Introduction to wsga}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -13,13 +13,13 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 
 ## Overview
 
-`rddsga` implements weighted subgroup analysis for regression discontinuity (RD) designs. The key idea is that when subgroups differ in observed characteristics near the RD cutoff, a raw comparison of subgroup-specific RD estimates conflates the causal effect of the subgroup with the effect of correlated moderators. Inverse probability weighting (IPW) rebalances observed moderators across subgroups, isolating the subgroup-attributable component of the treatment effect difference.
+`wsga` implements weighted subgroup analysis for research designs that require control variables for identification. Currently it covers regression discontinuity (RD) designs; sharp difference-in-differences (DiD) is planned. The key idea is that when subgroups differ in observed characteristics, a raw comparison of subgroup-specific treatment effects conflates the causal effect of the subgroup with the effect of correlated moderators. Inverse probability weighting (IPW) rebalances observed moderators across subgroups, isolating the subgroup-attributable component of the treatment effect difference.
 
 ## Installation
 
 ```r
 # Install from GitHub
-devtools::install_github("acarril/rddsga")
+devtools::install_github("acarril/wsga")
 ```
 
 ## Synthetic example
@@ -30,7 +30,7 @@ continuous moderator `m` has different means across subgroups near the cutoff.
 True per-subgroup RD effects are 2 (G=0) and 4 (G=1).
 
 ```{r load}
-library(rddsga)
+library(wsga)
 data(rddsga_synth)
 str(rddsga_synth)
 ```
@@ -38,7 +38,7 @@ str(rddsga_synth)
 ### Step 1: Unweighted subgroup analysis
 
 ```{r noipsw, cache = TRUE}
-fit_unw <- rddsga(
+fit_unw <- wsga(
   y ~ 1 | sgroup,          # outcome ~ covariates | subgroup
   data      = rddsga_synth,
   running   = ~ x,
@@ -54,7 +54,7 @@ print(fit_unw)
 Include the moderator `m` so the propensity score model can balance it.
 
 ```{r ipsw, cache = TRUE}
-fit_ipsw <- rddsga(
+fit_ipsw <- wsga(
   y ~ m | sgroup,
   data      = rddsga_synth,
   running   = ~ x,
@@ -70,7 +70,7 @@ across subgroups at the cutoff.
 ### Step 3: Adding bootstrap inference
 
 ```{r bootstrap, cache = TRUE}
-fit_boot <- rddsga(
+fit_boot <- wsga(
   y ~ m | sgroup,
   data      = rddsga_synth,
   running   = ~ x,
@@ -87,7 +87,7 @@ The dataset includes a fuzzy treatment `D` with ~80% compliance above the
 cutoff. Use `model = "iv"` to obtain 2SLS estimates.
 
 ```{r fuzzy, cache = TRUE}
-fit_iv <- rddsga(
+fit_iv <- wsga(
   y ~ m | sgroup,
   data      = rddsga_synth,
   running   = ~ x,
