@@ -94,25 +94,9 @@ Defaults to \code{unit} (pairs-cluster bootstrap over panel units).}
 weights.}
 }
 \value{
-An S3 object of class \code{"wsga"} with the following elements:
-\describe{
-\item{\code{coefficients}}{Named list \verb{(g0, g1, diff)} of point estimates.}
-\item{\code{se}}{Named list of standard errors.}
-\item{\code{pval}}{Named list of two-sided p-values.}
-\item{\code{ci}}{Named list of 95\% confidence intervals.}
-\item{\code{vcov}}{2×2 variance-covariance matrix for (g0, g1).}
-\item{\code{bootstrap}}{List with \code{draws} (B×3 matrix), \code{vcov}, \code{pval}, \code{ci},
-\code{B_ok}, \code{failed}. \code{NULL} if \code{bootstrap = FALSE}.}
-\item{\code{inference}}{Character: the inference mode in effect.}
-\item{\code{balance}}{List with \code{unweighted} and \code{weighted} balance tables.
-\code{NULL} if no balance variables.}
-\item{\code{pscore}}{Numeric vector of propensity scores. \code{NULL} if \code{noipsw}.}
-\item{\code{ipw_weights}}{Numeric vector of IPW weights. \code{NULL} if \code{noipsw}.}
-\item{\code{kernel_weights}}{Numeric vector of kernel weights.}
-\item{\code{model_fit}}{The underlying \code{lm} object.}
-\item{\code{call}}{The matched call.}
-\item{\code{nobs}}{Named integer: \code{total}, \code{in_bw}, \code{G0}, \code{G1}.}
-}
+An S3 object of class \code{"wsga"}. The structure is identical to
+\code{\link[=wsga_rdd]{wsga_rdd()}}; see that function for the full description of return elements.
+\code{model_fit} is always an \code{lm} object (sharp DiD only; no IV path).
 }
 \description{
 Estimates per-subgroup treatment effects and their difference in a sharp

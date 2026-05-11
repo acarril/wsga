@@ -151,8 +151,35 @@ weights. These are multiplied into the kernel weights and (if \code{!noipsw})
 into the IPW weights.}
 }
 \value{
-An S3 object of class \code{"wsga"}. See \code{\link[=wsga_did]{wsga_did()}} for the full
-description of return elements (identical structure).
+An S3 object of class \code{"wsga"} with the following elements:
+\describe{
+\item{\code{coefficients}}{Named list \verb{(g0, g1, diff)} of point estimates.}
+\item{\code{se}}{Named list of standard errors. Bootstrap-based for
+\code{inference} \code{"empirical"} or \code{"normal"}; sandwich/cluster-robust for
+\code{"analytical"}.}
+\item{\code{pval}}{Named list of two-sided p-values, computed according to
+\code{inference}.}
+\item{\code{ci}}{Named list of 95\% confidence intervals, computed according to
+\code{inference}.}
+\item{\code{vcov}}{2×2 variance-covariance matrix for (g0, g1).}
+\item{\code{bootstrap}}{List with \code{draws} (B×3 matrix), \code{vcov}, \code{pval}, \code{ci},
+\code{B_ok} (surviving reps), \code{failed} (dropped reps). \code{NULL} if
+\code{bootstrap = FALSE}.}
+\item{\code{inference}}{Character: the inference mode in effect.}
+\item{\code{balance}}{List with \code{unweighted} and \code{weighted} balance table data
+frames (each with global stats). \code{NULL} if no balance variables.}
+\item{\code{pscore}}{Numeric vector of propensity scores (NA outside active
+set). \code{NULL} if \code{noipsw = TRUE}.}
+\item{\code{ipw_weights}}{Numeric vector of IPW weights. \code{NULL} if
+\code{noipsw = TRUE}.}
+\item{\code{kernel_weights}}{Numeric vector of kernel weights.}
+\item{\code{model_fit}}{The underlying fitted model: an \code{lm} object for
+\code{model = "rf"} or \code{"fs"}, or an \code{ivreg} object for \code{model = "iv"}.}
+\item{\code{call}}{The matched call.}
+\item{\code{nobs}}{Named integer: \code{total}, \code{in_bw}, \code{G0}, \code{G1}.}
+\item{\code{bwidth}, \code{cutoff}, \code{kernel}, \code{p}, \code{m}, \code{model}}{Configuration
+values as supplied.}
+}
 }
 \description{
 Estimates per-subgroup treatment effects and their difference in a sharp or

@@ -94,8 +94,35 @@ NULL
 #'   weights. These are multiplied into the kernel weights and (if `!noipsw`)
 #'   into the IPW weights.
 #'
-#' @return An S3 object of class `"wsga"`. See [wsga_did()] for the full
-#'   description of return elements (identical structure).
+#' @return An S3 object of class `"wsga"` with the following elements:
+#' \describe{
+#'   \item{`coefficients`}{Named list `(g0, g1, diff)` of point estimates.}
+#'   \item{`se`}{Named list of standard errors. Bootstrap-based for
+#'     `inference` `"empirical"` or `"normal"`; sandwich/cluster-robust for
+#'     `"analytical"`.}
+#'   \item{`pval`}{Named list of two-sided p-values, computed according to
+#'     `inference`.}
+#'   \item{`ci`}{Named list of 95% confidence intervals, computed according to
+#'     `inference`.}
+#'   \item{`vcov`}{2×2 variance-covariance matrix for (g0, g1).}
+#'   \item{`bootstrap`}{List with `draws` (B×3 matrix), `vcov`, `pval`, `ci`,
+#'     `B_ok` (surviving reps), `failed` (dropped reps). `NULL` if
+#'     `bootstrap = FALSE`.}
+#'   \item{`inference`}{Character: the inference mode in effect.}
+#'   \item{`balance`}{List with `unweighted` and `weighted` balance table data
+#'     frames (each with global stats). `NULL` if no balance variables.}
+#'   \item{`pscore`}{Numeric vector of propensity scores (NA outside active
+#'     set). `NULL` if `noipsw = TRUE`.}
+#'   \item{`ipw_weights`}{Numeric vector of IPW weights. `NULL` if
+#'     `noipsw = TRUE`.}
+#'   \item{`kernel_weights`}{Numeric vector of kernel weights.}
+#'   \item{`model_fit`}{The underlying fitted model: an `lm` object for
+#'     `model = "rf"` or `"fs"`, or an `ivreg` object for `model = "iv"`.}
+#'   \item{`call`}{The matched call.}
+#'   \item{`nobs`}{Named integer: `total`, `in_bw`, `G0`, `G1`.}
+#'   \item{`bwidth`, `cutoff`, `kernel`, `p`, `m`, `model`}{Configuration
+#'     values as supplied.}
+#' }
 #'
 #' @examples
 #' data(rddsga_synth)
@@ -223,25 +250,9 @@ wsga_rdd <- function(formula,
 #' @param weights Character or `NULL`. Column name of pre-existing observation
 #'   weights.
 #'
-#' @return An S3 object of class `"wsga"` with the following elements:
-#' \describe{
-#'   \item{`coefficients`}{Named list `(g0, g1, diff)` of point estimates.}
-#'   \item{`se`}{Named list of standard errors.}
-#'   \item{`pval`}{Named list of two-sided p-values.}
-#'   \item{`ci`}{Named list of 95% confidence intervals.}
-#'   \item{`vcov`}{2×2 variance-covariance matrix for (g0, g1).}
-#'   \item{`bootstrap`}{List with `draws` (B×3 matrix), `vcov`, `pval`, `ci`,
-#'     `B_ok`, `failed`. `NULL` if `bootstrap = FALSE`.}
-#'   \item{`inference`}{Character: the inference mode in effect.}
-#'   \item{`balance`}{List with `unweighted` and `weighted` balance tables.
-#'     `NULL` if no balance variables.}
-#'   \item{`pscore`}{Numeric vector of propensity scores. `NULL` if `noipsw`.}
-#'   \item{`ipw_weights`}{Numeric vector of IPW weights. `NULL` if `noipsw`.}
-#'   \item{`kernel_weights`}{Numeric vector of kernel weights.}
-#'   \item{`model_fit`}{The underlying `lm` object.}
-#'   \item{`call`}{The matched call.}
-#'   \item{`nobs`}{Named integer: `total`, `in_bw`, `G0`, `G1`.}
-#' }
+#' @return An S3 object of class `"wsga"`. The structure is identical to
+#'   [wsga_rdd()]; see that function for the full description of return elements.
+#'   `model_fit` is always an `lm` object (sharp DiD only; no IV path).
 #'
 #' @examples
 #' data(wsga_did_synth)
@@ -367,8 +378,6 @@ wsga_did <- function(formula,
            "sharp DiD only. If you have imperfect compliance with treatment in a panel ",
            "setting, consider this design out of scope for this package.")
     }
-    # RDD-only knobs that have no meaning in DiD: warn quietly if user passed them
-    # explicitly (we can't detect missing-vs-default cleanly, so just ignore).
   }
 
   # Resolve `inference`. Three modes; default depends on `bootstrap`.
