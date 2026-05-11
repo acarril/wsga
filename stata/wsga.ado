@@ -1,4 +1,4 @@
-*! 1.0.1 Alvaro Carril 2026-05-11
+*! 1.0.2 Alvaro Carril 2026-05-11
 
 // ── Dispatcher ────────────────────────────────────────────────────────────────
 program define wsga
@@ -1137,12 +1137,6 @@ end
 
 ********************************************************************************
 * _wsga_did: sharp 2-period DiD pipeline
-*   Receives the original wsga arglist (called via `_wsga_did `0'`).  Parses its
-*   own syntax (mostly mirroring wsga's, with DiD-required options).  Currently
-*   implements: input validation, design-matrix construction, analytical
-*   cluster-robust estimation via xtreg, fe.  IPW, balance tables, and the
-*   pairs cluster bootstrap are added in follow-up patches; the corresponding
-*   options are accepted but produce a warning if requested.
 ********************************************************************************
 
 program define _wsga_did, eclass
@@ -1163,6 +1157,12 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   // ── Outcome and covariates
   local depvar : word 1 of `varlist'
   local covariates : list varlist - depvar
+
+  // ipsweight()/pscore(): user-named output variables or tempvars (mirrors RDD)
+  if "`ipsweight'" != "" confirm new variable `ipsweight'
+  else tempvar ipsweight
+  if "`pscore'" != "" confirm new variable `pscore'
+  else tempvar pscore
 
   // ── Validate: time has exactly 2 unique non-missing values
   qui levelsof `time' if `touse', local(t_vals)
@@ -1190,8 +1190,8 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     }
   }
 
-  // ── Unit-constancy checks (treat, sgroup, balance moderators)
-  foreach v in `treat' `sgroup' `balance' {
+  // ── Unit-constancy checks (treat, sgroup, balance moderators, blockbootstrap)
+  foreach v in `treat' `sgroup' `balance' `blockbootstrap' {
     tempvar _dist
     qui by `unit' (`v'), sort: gen byte `_dist' = (`v'[1] != `v'[_N])
     qui summarize `_dist' if `touse', meanonly
@@ -1228,9 +1228,9 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   // Because G and the moderators are unit-constant (validated above), fitting
   // on the long panel produces unit-constant pscore values — the per-row
   // values are correct as-is and no broadcast is required.
-  tempvar pscore_var ipw_var
-  qui gen double `pscore_var' = .
-  qui gen double `ipw_var'    = 1
+  // When comsup is specified, units outside the G=1 pscore range are excluded.
+  qui gen double `pscore'    = .
+  qui gen double `ipsweight' = 1
 
   if "`ipsw'" != "noipsw" & `: list sizeof balance' > 0 {
     if "`probit'" != "" {
@@ -1240,53 +1240,61 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
       qui logit `sgroup' `balance' if `touse'
     }
     qui predict double _wsga_ps if `touse', pr
-    qui replace `pscore_var' = _wsga_ps
+    qui replace `pscore' = _wsga_ps
     qui drop _wsga_ps
 
     // Unit-level counts for normalization (count one row per unit)
     tempvar unit_first
     qui by `unit' (`touse'), sort: gen byte `unit_first' = (_n == 1) & `touse'
-    qui count if `unit_first' & `sgroup' == 0 & !mi(`pscore_var')
+
+    // Common support restriction: use G=1 pscore range (mirrors RDD convention)
+    tempvar _comsup
+    if "`comsup'" != "" {
+      qui sum `pscore' if `sgroup' == 1 & `unit_first' & `touse', meanonly
+      cap drop comsup
+      qui gen byte comsup    = (`pscore' >= r(min) & `pscore' <= r(max)) if `touse' & !mi(`sgroup')
+      qui gen byte `_comsup' = comsup
+    }
+    else {
+      qui gen byte `_comsup' = 1 if `touse' & !mi(`sgroup')
+    }
+
+    qui count if `unit_first' & `sgroup' == 0 & !mi(`pscore') & `_comsup'
     local N_G0 = r(N)
-    qui count if `unit_first' & `sgroup' == 1 & !mi(`pscore_var')
+    qui count if `unit_first' & `sgroup' == 1 & !mi(`pscore') & `_comsup'
     local N_G1 = r(N)
     local N_tot = `N_G0' + `N_G1'
 
     // m=2: balance both groups toward pooled (the default and paper-preferred)
     // m=1: balance group 1 toward group 0  (ATT for G=0)
     // m=0: balance group 0 toward group 1  (ATT for G=1)
-    qui replace `ipw_var' = .
+    qui replace `ipsweight' = .
     if `m' == 2 {
-      qui replace `ipw_var' = (`N_G1' / `N_tot') / `pscore_var'         if `sgroup' == 1 & !mi(`pscore_var')
-      qui replace `ipw_var' = (`N_G0' / `N_tot') / (1 - `pscore_var')   if `sgroup' == 0 & !mi(`pscore_var')
+      qui replace `ipsweight' = (`N_G1' / `N_tot') / `pscore'         if `sgroup' == 1 & !mi(`pscore') & `_comsup'
+      qui replace `ipsweight' = (`N_G0' / `N_tot') / (1 - `pscore')   if `sgroup' == 0 & !mi(`pscore') & `_comsup'
     }
     else if `m' == 1 {
-      qui replace `ipw_var' = (1 - `pscore_var') / `pscore_var'         if `sgroup' == 1 & !mi(`pscore_var')
-      qui replace `ipw_var' = 1                                          if `sgroup' == 0
+      qui replace `ipsweight' = (1 - `pscore') / `pscore'             if `sgroup' == 1 & !mi(`pscore') & `_comsup'
+      qui replace `ipsweight' = 1                                      if `sgroup' == 0
     }
     else if `m' == 0 {
-      qui replace `ipw_var' = `pscore_var' / (1 - `pscore_var')          if `sgroup' == 0 & !mi(`pscore_var')
-      qui replace `ipw_var' = 1                                          if `sgroup' == 1
+      qui replace `ipsweight' = `pscore' / (1 - `pscore')             if `sgroup' == 0 & !mi(`pscore') & `_comsup'
+      qui replace `ipsweight' = 1                                      if `sgroup' == 1
     }
     else {
       di as error "m() must be 0, 1, or 2 (got `m')."
       exit 198
     }
-    // Replace NAs in ipw with 0 so they drop out of the regression
-    qui replace `ipw_var' = 0 if mi(`ipw_var')
-  }
-
-  if "`bootstrap'" != "nobootstrap" {
-    di as text ///
-"Note: bootstrap inference in DiD mode is not yet implemented in this Stata build. Analytical cluster-robust SEs are reported instead."
+    // Replace NAs in ipsweight with 0 so they drop out of the regression
+    qui replace `ipsweight' = 0 if mi(`ipsweight')
   }
 
   // ── Estimate: long-form TWFE with unit FE absorbed via xtreg, fe.
   // Weights enter as pweights so SE machinery is consistent with sampling-
-  // weight semantics.  When noipsw / no balance, ipw_var is identically 1.
+  // weight semantics.  When noipsw / no balance, ipsweight is identically 1.
   qui xtset `unit'
   local rhs `G0_Z' `G1_Z' `G0_post' `G1_post' `g0_covs' `g1_covs'
-  xtreg `depvar' `rhs' [pw=`ipw_var'] if `touse' & `ipw_var' > 0, fe vce(cluster `unit')
+  xtreg `depvar' `rhs' [pw=`ipsweight'] if `touse' & `ipsweight' > 0, fe vce(cluster `unit')
   tempvar _did_esample
   gen byte `_did_esample' = e(sample)
 
@@ -1345,7 +1353,12 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     forvalues _b = 1/`bsreps' {
       qui use `_wsga_did_panel', clear
       capture {
-        qui bsample, cluster(`unit') idcluster(_wsga_new_unit)
+        if "`blockbootstrap'" != "" {
+          qui bsample, cluster(`unit') idcluster(_wsga_new_unit) strata(`blockbootstrap')
+        }
+        else {
+          qui bsample, cluster(`unit') idcluster(_wsga_new_unit)
+        }
 
         tempvar _b_pscore _b_ipw
         qui gen double `_b_pscore' = .
@@ -1353,7 +1366,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
         if "`ipsw'" != "noipsw" & `: list sizeof balance' > 0 {
           if "`fixedps'" != "" {
             // fixedps: carry original-sample pscore; skip logit/probit refit
-            qui replace `_b_pscore' = `pscore_var'
+            qui replace `_b_pscore' = `pscore'
           }
           else {
             if "`probit'" != "" qui probit `sgroup' `balance'
@@ -1363,26 +1376,36 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
             qui drop _wsga_ps_b
           }
 
+          // Common support per bootstrap rep (mirrors main-sample logic)
+          tempvar _b_comsup _b_uf
+          if "`comsup'" != "" {
+            qui by _wsga_new_unit (`sgroup'), sort: gen byte `_b_uf' = (_n == 1)
+            qui sum `_b_pscore' if `sgroup' == 1 & `_b_uf' & !mi(`_b_pscore'), meanonly
+            qui gen byte `_b_comsup' = (`_b_pscore' >= r(min) & `_b_pscore' <= r(max)) if !mi(`_b_pscore')
+          }
+          else {
+            qui gen byte `_b_comsup' = 1 if !mi(`_b_pscore')
+            qui by _wsga_new_unit (`sgroup'), sort: gen byte `_b_uf' = (_n == 1)
+          }
+
           // IPW normalization: always recount units per bootstrap rep
-          tempvar _b_uf
-          qui by _wsga_new_unit (`sgroup'), sort: gen byte `_b_uf' = (_n == 1)
-          qui count if `_b_uf' & `sgroup' == 0 & !mi(`_b_pscore')
+          qui count if `_b_uf' & `sgroup' == 0 & !mi(`_b_pscore') & `_b_comsup'
           local _N0 = r(N)
-          qui count if `_b_uf' & `sgroup' == 1 & !mi(`_b_pscore')
+          qui count if `_b_uf' & `sgroup' == 1 & !mi(`_b_pscore') & `_b_comsup'
           local _N1 = r(N)
           local _NT = `_N0' + `_N1'
 
           qui replace `_b_ipw' = .
           if `m' == 2 {
-            qui replace `_b_ipw' = (`_N1' / `_NT') / `_b_pscore'         if `sgroup' == 1 & !mi(`_b_pscore')
-            qui replace `_b_ipw' = (`_N0' / `_NT') / (1 - `_b_pscore')   if `sgroup' == 0 & !mi(`_b_pscore')
+            qui replace `_b_ipw' = (`_N1' / `_NT') / `_b_pscore'         if `sgroup' == 1 & !mi(`_b_pscore') & `_b_comsup'
+            qui replace `_b_ipw' = (`_N0' / `_NT') / (1 - `_b_pscore')   if `sgroup' == 0 & !mi(`_b_pscore') & `_b_comsup'
           }
           else if `m' == 1 {
-            qui replace `_b_ipw' = (1 - `_b_pscore') / `_b_pscore'        if `sgroup' == 1 & !mi(`_b_pscore')
+            qui replace `_b_ipw' = (1 - `_b_pscore') / `_b_pscore'        if `sgroup' == 1 & !mi(`_b_pscore') & `_b_comsup'
             qui replace `_b_ipw' = 1                                       if `sgroup' == 0
           }
           else {
-            qui replace `_b_ipw' = `_b_pscore' / (1 - `_b_pscore')        if `sgroup' == 0 & !mi(`_b_pscore')
+            qui replace `_b_ipw' = `_b_pscore' / (1 - `_b_pscore')        if `sgroup' == 0 & !mi(`_b_pscore') & `_b_comsup'
             qui replace `_b_ipw' = 1                                       if `sgroup' == 1
           }
           qui replace `_b_ipw' = 0 if mi(`_b_ipw')
@@ -1534,7 +1557,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
           local _bal_wlabel "Unweighted"
         }
         else {
-          qui gen double `_bal_wt' = `ipw_var'
+          qui gen double `_bal_wt' = `ipsweight'
           local _bal_wlabel "IPW-weighted"
         }
         di
@@ -1610,6 +1633,13 @@ end
 
 /*
 CHANGE LOG
+1.0.2
+  - fix(Stata/did): wire up ipsweight()/pscore() as named output variables
+  - fix(Stata/did): implement comsup restriction (G=1 pscore range, unit-level)
+  - fix(Stata/did): implement blockbootstrap() as stratified cluster resample
+  - fix(Stata/did): validate blockbootstrap() variable for unit-constancy
+  - fix(Stata/did): apply comsup consistently in bootstrap reps
+  - fix(Stata/did): remove stale "bootstrap not implemented" warning
 1.0.1
   - bug(Stata/did): add ereturn post at end of _wsga_did to trim e(b)/e(V) to
     G0_Z and G1_Z columns; bootstrap path now also computes covariance of the

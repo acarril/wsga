@@ -1,5 +1,24 @@
 # wsga (R package) NEWS
 
+## wsga 1.0.2 (2026-05-11)
+
+### Bug fixes
+
+- **Stata**: `wsga did` now correctly wires up `ipsweight()` and `pscore()` as
+  named output variables in the dataset (previously accepted but silently
+  ignored) (#25).
+- **Stata**: `wsga did` now implements `comsup` — units outside the G=1
+  propensity score range are excluded from estimation and a `comsup` variable
+  is created in the dataset, matching RDD behavior. Common support is
+  re-evaluated per bootstrap replicate (#25).
+- **Stata**: `wsga did` now implements `blockbootstrap(varname)` as a
+  stratified unit-level cluster resample (`bsample, strata(varname)`); the
+  variable is validated for unit-constancy (#25).
+- **Stata**: align version numbers across all Stata files to unified `1.0.x`
+  scheme (`wsga.sthlp`, `wsga_rdd.sthlp`, `rddsga.*` previously lagged).
+
+---
+
 ## wsga 1.0.1 (2026-05-11)
 
 ### Bug fixes

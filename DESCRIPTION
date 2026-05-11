@@ -1,6 +1,6 @@
 Package: wsga
 Title: Weighted Subgroup Analysis
-Version: 1.0.1
+Version: 1.0.2
 Authors@R:
     person("Alvaro", "Carril", email = "alvarocarril@gmail.com", role = c("aut", "cre"))
 Description: Implements inverse probability weighted (IPW) subgroup analysis for

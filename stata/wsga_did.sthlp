@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 1.0.1 2026-05-11}{...}
+{* *! version 1.0.2 2026-05-11}{...}
 {viewerjumpto "Stored results" "wsga_did##results"}{...}
 {title:Title}
 
@@ -32,7 +32,9 @@
 {synopt:{opt noipsw}}skip IPW reweighting{p_end}
 {synopt:{opt m(#)}}weighting mode: 2 = both groups (default), 1 = G1→G0, 0 = G0→G1{p_end}
 {synopt:{opt probit}}use probit instead of logit for propensity score{p_end}
-{synopt:{opt comsup}}restrict to common propensity score support{p_end}
+{synopt:{opt comsup}}restrict to common propensity score support (units outside the G=1 pscore range are dropped from estimation){p_end}
+{synopt:{opt ipsweight(newvar)}}save IPW weights to {it:newvar} in the dataset{p_end}
+{synopt:{opt pscore(newvar)}}save propensity score to {it:newvar} in the dataset{p_end}
 {synopt:{opt dibalance}}display balance tables{p_end}
 {syntab:Inference}
 {synopt:{opt nobootstrap}}report analytical cluster-robust SEs only{p_end}
@@ -40,7 +42,7 @@
 {synopt:{opt normal}}normal-approximation CIs from bootstrap SE{p_end}
 {synopt:{opt seed(#)}}RNG seed for reproducibility{p_end}
 {synopt:{opt fixedps}}hold propensity score fixed across bootstrap reps (diagnostic){p_end}
-{synopt:{opt blockbootstrap(varname)}}stratified block bootstrap{p_end}
+{synopt:{opt blockbootstrap(varname)}}stratify the unit-level cluster resample by {it:varname}; must be unit-constant{p_end}
 {synopt:{opt weights(varname)}}pre-existing observation weights{p_end}
 {synoptline}
 
