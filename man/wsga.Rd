@@ -22,7 +22,8 @@ wsga(
   show_balance = FALSE,
   rbalance = 0L,
   bootstrap = TRUE,
-  bsreps = 50L,
+  bsreps = 200L,
+  inference = NULL,
   block_var = NULL,
   fixed_fs = FALSE,
   seed = NULL,
@@ -89,10 +90,23 @@ Default \code{FALSE}.}
 table: \code{0} = mean at the cutoff (local linear extrapolation, default),
 \code{1} = mean in the full bandwidth sample.}
 
-\item{bootstrap}{Logical. Compute bootstrap standard errors and empirical
-CIs/p-values? Default \code{TRUE}.}
+\item{bootstrap}{Logical. Run the bootstrap loop (refits the full pipeline
+per replicate)? Default \code{TRUE}.}
 
-\item{bsreps}{Positive integer: number of bootstrap replications. Default \code{50}.}
+\item{bsreps}{Positive integer: number of bootstrap replications. Default \code{200}.}
+
+\item{inference}{Character. How standard errors, CIs, and p-values are
+computed and reported. One of:
+\itemize{
+\item \code{"empirical"}: bootstrap SE; empirical (percentile) CIs at 2.5/97.5;
+\verb{(1 + count)/(B + 1)} p-values. Requires \code{bootstrap = TRUE}. \strong{Default
+when \code{bootstrap = TRUE}.}
+\item \code{"normal"}: bootstrap SE; normal-approximation CIs \verb{b ± z·SE} and
+p-values \verb{2·(1 − Φ(|t|))}. Requires \code{bootstrap = TRUE}.
+\item \code{"analytical"}: sandwich (or cluster-robust) SE; CIs and p-values from
+the t distribution with the regression residual df. Requires
+\code{bootstrap = FALSE}. \strong{Default when \code{bootstrap = FALSE}.}
+}}
 
 \item{block_var}{Character or \code{NULL}. Column name for stratified (block)
 bootstrap resampling. Default \code{NULL} (unstratified).}
@@ -118,14 +132,18 @@ into the IPW weights.}
 An S3 object of class \code{"wsga"} with the following elements:
 \describe{
 \item{\code{coefficients}}{Named list \verb{(g0, g1, diff)} of point estimates.}
-\item{\code{se}}{Named list of standard errors (from bootstrap vcov if
-\code{bootstrap = TRUE}, else sandwich).}
-\item{\code{pval}}{Named list of two-sided p-values.}
-\item{\code{ci}}{Named list of 95\% confidence intervals (empirical if bootstrap,
-else normal-approximation).}
+\item{\code{se}}{Named list of standard errors. Bootstrap-based for
+\code{inference} \code{"empirical"} or \code{"normal"}; sandwich/cluster-robust for
+\code{"analytical"}.}
+\item{\code{pval}}{Named list of two-sided p-values, computed according to
+\code{inference}.}
+\item{\code{ci}}{Named list of 95\% confidence intervals, computed according to
+\code{inference}.}
 \item{\code{vcov}}{2×2 variance-covariance matrix for (g0, g1).}
-\item{\code{bootstrap}}{List with \code{draws} (B×2 matrix), \code{vcov}, \code{pval}, \code{ci}
-from bootstrap. \code{NULL} if \code{bootstrap = FALSE}.}
+\item{\code{bootstrap}}{List with \code{draws} (B×3 matrix), \code{vcov}, \code{pval}, \code{ci},
+\code{B_ok} (surviving reps), \code{failed} (dropped reps). \code{NULL} if
+\code{bootstrap = FALSE}.}
+\item{\code{inference}}{Character: the inference mode in effect.}
 \item{\code{balance}}{List with \code{unweighted} and \code{weighted} balance table data
 frames (each with global stats). \code{NULL} if no balance variables.}
 \item{\code{pscore}}{Numeric vector of propensity scores (NA outside active

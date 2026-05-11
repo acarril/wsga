@@ -130,6 +130,7 @@ head(fit_boot$bootstrap$draws)
 | `m` | IPW mode: `2` = balance both groups (default), `1` = ATT G=1, `0` = ATT G=0 |
 | `comsup` | Restrict to common propensity score support |
 | `rbalance` | Balance table means: `0` = at cutoff (default), `1` = in sample |
+| `inference` | `"empirical"` (default with bootstrap), `"normal"` (bootstrap SE + normal-approx CI), or `"analytical"` (default without bootstrap, sandwich/cluster-robust SE) |
 | `block_var` | Column name for stratified block bootstrap |
 | `vce` | Sandwich SE type: `"HC1"` (default), `"HC0"`, `"HC2"`, `"HC3"`, `"cluster"` |
 | `ps_model` | `"logit"` (default) or `"probit"` for propensity score |
