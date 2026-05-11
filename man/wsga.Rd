@@ -26,6 +26,7 @@ wsga(
   inference = NULL,
   block_var = NULL,
   fixed_fs = FALSE,
+  fixed_ps = FALSE,
   seed = NULL,
   vce = "HC1",
   cluster_var = NULL,
@@ -117,6 +118,17 @@ must be constant within each cluster (validated at runtime).}
 \item{fixed_fs}{Logical. Fixed first-stage bootstrap for IV: bootstrap the
 reduced form and divide by the point-estimate first-stage coefficients.
 Default \code{FALSE}.}
+
+\item{fixed_ps}{Logical. Diagnostic flag. When \code{TRUE}, the propensity score
+model is \strong{not} refit inside the bootstrap loop; instead, each
+resampled row inherits the propensity score (and common-support
+membership) from its original-sample row. This isolates the
+variance contribution of the outcome model from that of the
+weight-estimation step. \strong{It understates the SE relative to the
+paper's intended interpretation}, which is why the default is
+\code{FALSE}. Useful for sanity-checking and for fast iteration on the
+outcome specification when the PS fit is expensive. No effect when
+\code{noipsw = TRUE} or when there are no balance variables.}
 
 \item{seed}{Integer or \code{NULL}. RNG seed for reproducibility. Default \code{NULL}.}
 

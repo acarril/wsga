@@ -27,17 +27,22 @@ test_that("row-level bootstrap (cluster_var = NULL) does not expose N_clusters",
   expect_null(fit$cluster_var_name)
 })
 
-test_that("build_cluster_rep_data assigns fresh IDs per draw", {
+test_that("build_cluster_rep_data assigns fresh IDs per draw and returns orig_idx", {
   d <- data.frame(school = c("A", "A", "B", "B", "C"),
                   y      = 1:5)
   out <- build_cluster_rep_data(d, "school", d$school,
                                 drawn = c("A", "A", "B"))
+  # Returns a list with data + orig_idx
+  expect_named(out, c("data", "orig_idx"))
   # A drawn twice → two distinct fresh IDs; B drawn once
-  expect_equal(length(unique(out$school)), 3L)
-  expect_true(all(grepl("__d[0-9]+$", out$school)))
+  expect_equal(length(unique(out$data$school)), 3L)
+  expect_true(all(grepl("__d[0-9]+$", out$data$school)))
   # Original outcomes preserved (each A row appears twice in the resample)
-  expect_equal(sum(out$y %in% c(1, 2)), 4L)  # 2 A rows × 2 draws
-  expect_equal(sum(out$y %in% c(3, 4)), 2L)  # 2 B rows × 1 draw
+  expect_equal(sum(out$data$y %in% c(1, 2)), 4L)  # 2 A rows × 2 draws
+  expect_equal(sum(out$data$y %in% c(3, 4)), 2L)  # 2 B rows × 1 draw
+  # orig_idx maps resampled rows back to original row indices
+  expect_equal(length(out$orig_idx), nrow(out$data))
+  expect_equal(out$orig_idx, c(1L, 2L, 1L, 2L, 3L, 4L))
 })
 
 test_that("cluster_resample with strata respects strata sizes", {
