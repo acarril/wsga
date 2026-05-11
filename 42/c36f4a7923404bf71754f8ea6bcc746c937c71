@@ -1,0 +1,23 @@
+stata/wsga.ado
+  s_4cb00f9b578a6e::t_6ad2c8a5056605 1170-1180,1182-1346,1353-1359
+  s_4cb00f9b578a6e::t_b182f4c874990d 1,5-7,13-32,34-35,41-43
+  s_4cb00f9b578a6e::t_5c0e4e61f6e3b7 4
+  s_4cb00f9b578a6e::t_bdfb79e5dbaa6e 1181
+  s_4cb00f9b578a6e::t_5503116c25c771 33,36-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.6",
+  "base_commit_sha": "42c36f4a7923404bf71754f8ea6bcc746c937c71",
+  "prompts": {},
+  "sessions": {
+    "s_4cb00f9b578a6e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "25e699ac-6a44-4a2e-8c22-4a4c2456b65f",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
