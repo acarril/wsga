@@ -1,12 +1,46 @@
-*! 1.2.0 Alvaro Carril 2026-05-09
+*! 1.3.0 Alvaro Carril 2026-05-11
 program define wsga, eclass
 version 11.1
-syntax varlist(min=2 numeric fv) [if] [in], ///
-  SGroup(name) BWidth(real) [ fuzzy(name) Cutoff(real 0) Kernel(string) /// important inputs
+syntax varlist(min=1 numeric fv) [if] [in], ///
+  SGroup(name) [ DESign(string) /// design switch: rdd (default) or did
+    BWidth(real -1) fuzzy(name) Cutoff(real 0) Kernel(string) /// RDD-specific
+    UNIt(varname) TIMe(varname) TReat(varname) POST_value(string) /// DiD-specific
   	IPSWeight(name) PSCore(name) comsup /// newvars
     BALance(varlist numeric) DIBALance probit /// balancepscore opts
     IVregress REDUCEDform FIRSTstage vce(string) p(int 1) m(int 2) rbalance(int 0) /// model opts
     noBOOTstrap bsreps(real 50) FIXEDbootstrap BLOCKbootstrap(string) NORMal noipsw weights(string) ] // bootstrap options
+
+// ─── Design dispatch ──────────────────────────────────────────────────────────
+if "`design'" == "" local design "rdd"
+if "`design'" != "rdd" & "`design'" != "did" {
+  di as error "design() must be either 'rdd' or 'did' (got `design')."
+  exit 198
+}
+if "`design'" == "did" {
+  // Validate DiD-required options
+  if "`unit'" == "" | "`time'" == "" | "`treat'" == "" {
+    di as error "design(did) requires options unit(), time(), and treat()."
+    exit 198
+  }
+  if "`ivregress'" != "" | "`firststage'" != "" {
+    di as error ///
+"Fuzzy DiD is not currently supported. The paper's DiD identification (Carril et al., {it:Subgroup effect identification in DiD designs}) covers sharp DiD only. If you have imperfect compliance with treatment in a panel setting, consider this design out of scope."
+    exit 198
+  }
+  _wsga_did `0'
+  exit
+}
+// design == "rdd" from here: require bwidth and at least 2 variables in varlist
+if `bwidth' < 0 {
+  di as error "bwidth() is required (positive) when design(rdd) (default)."
+  exit 198
+}
+local n_varlist : word count `varlist'
+if `n_varlist' < 2 {
+  di as error "design(rdd) requires both an outcome variable and an assignment variable in the varlist."
+  exit 198
+}
+// ──────────────────────────────────────────────────────────────────────────────
 
 *-------------------------------------------------------------------------------
 * Check inputs
@@ -1133,9 +1167,438 @@ ereturn scalar `matname'_N_G0 = `N_G0'
 end
 
 ********************************************************************************
+* _wsga_did: sharp 2-period DiD pipeline
+*   Receives the original wsga arglist (called via `_wsga_did `0'`).  Parses its
+*   own syntax (mostly mirroring wsga's, with DiD-required options).  Currently
+*   implements: input validation, design-matrix construction, analytical
+*   cluster-robust estimation via xtreg, fe.  IPW, balance tables, and the
+*   pairs cluster bootstrap are added in follow-up patches; the corresponding
+*   options are accepted but produce a warning if requested.
+********************************************************************************
+
+program define _wsga_did, eclass
+version 11.1
+syntax varlist(min=1 numeric fv) [if] [in], ///
+  SGroup(name) UNIt(varname) TIMe(varname) TReat(varname) ///
+  [ DESign(string) POST_value(string) ///
+    BALance(varlist numeric) DIBALance probit ///
+    IPSWeight(name) PSCore(name) comsup ///
+    vce(string) m(int 2) rbalance(int 0) ///
+    noBOOTstrap bsreps(real 200) FIXEDbootstrap BLOCKbootstrap(string) ///
+    NORMal noipsw weights(string) ///
+    /* RDD-only options that are silently accepted and ignored: */ ///
+    BWidth(real -1) Cutoff(real 0) Kernel(string) ///
+    fuzzy(name) IVregress REDUCEDform FIRSTstage p(int 1) ]
+
+  // ── Sample mask
+  marksample touse, novarlist
+  markout `touse' `unit' `time' `treat' `sgroup'
+
+  // ── Outcome and covariates
+  local depvar : word 1 of `varlist'
+  local covariates : list varlist - depvar
+
+  // ── Validate: time has exactly 2 unique non-missing values
+  qui levelsof `time' if `touse', local(t_vals)
+  local n_tvals : word count `t_vals'
+  if `n_tvals' != 2 {
+    di as error ///
+"design(did) requires `time' to have exactly 2 unique non-missing values; found `n_tvals'. Staggered adoption is not currently supported."
+    exit 198
+  }
+
+  // ── Resolve post_value
+  if "`post_value'" == "" {
+    qui summarize `time' if `touse', meanonly
+    local post_value = r(max)
+  }
+  else {
+    local pv_ok = 0
+    foreach tv of local t_vals {
+      if "`tv'" == "`post_value'" local pv_ok = 1
+    }
+    if `pv_ok' == 0 {
+      di as error ///
+"post_value(`post_value') is not one of the unique values of `time' (`t_vals')."
+      exit 198
+    }
+  }
+
+  // ── Unit-constancy checks (treat, sgroup, balance moderators)
+  foreach v in `treat' `sgroup' `balance' {
+    tempvar _dist
+    qui by `unit' (`v'), sort: gen byte `_dist' = (`v'[1] != `v'[_N])
+    qui summarize `_dist' if `touse', meanonly
+    if r(max) > 0 {
+      di as error ///
+"`v' varies within `unit' (the DiD design requires `v' to be unit-level)."
+      exit 198
+    }
+    drop `_dist'
+  }
+
+  // ── Build design variables
+  tempvar G0 G1 post G0_Z G1_Z G0_post G1_post
+  qui gen byte `G0'      = (`sgroup' == 0)
+  qui gen byte `G1'      = (`sgroup' == 1)
+  qui gen byte `post'    = (`time' == `post_value')
+  qui gen byte `G0_Z'    = `G0' * `treat' * `post'    // delta_0
+  qui gen byte `G1_Z'    = `G1' * `treat' * `post'    // delta_1
+  qui gen byte `G0_post' = `G0' * `post'
+  qui gen byte `G1_post' = `G1' * `post'
+
+  // ── Covariate × G interactions
+  local g0_covs ""
+  local g1_covs ""
+  foreach v of local covariates {
+    tempvar g0_`v' g1_`v'
+    qui gen double `g0_`v'' = `G0' * `v'
+    qui gen double `g1_`v'' = `G1' * `v'
+    local g0_covs "`g0_covs' `g0_`v''"
+    local g1_covs "`g1_covs' `g1_`v''"
+  }
+
+  // ── IPW: fit logit/probit on (G, balance) and compute weights.
+  // Because G and the moderators are unit-constant (validated above), fitting
+  // on the long panel produces unit-constant pscore values — the per-row
+  // values are correct as-is and no broadcast is required.
+  tempvar pscore_var ipw_var
+  qui gen double `pscore_var' = .
+  qui gen double `ipw_var'    = 1
+
+  if "`ipsw'" != "noipsw" & `: list sizeof balance' > 0 {
+    if "`probit'" != "" {
+      qui probit `sgroup' `balance' if `touse'
+    }
+    else {
+      qui logit `sgroup' `balance' if `touse'
+    }
+    qui predict double _wsga_ps if `touse', pr
+    qui replace `pscore_var' = _wsga_ps
+    qui drop _wsga_ps
+
+    // Unit-level counts for normalization (count one row per unit)
+    tempvar unit_first
+    qui by `unit' (`touse'), sort: gen byte `unit_first' = (_n == 1) & `touse'
+    qui count if `unit_first' & `sgroup' == 0 & !mi(`pscore_var')
+    local N_G0 = r(N)
+    qui count if `unit_first' & `sgroup' == 1 & !mi(`pscore_var')
+    local N_G1 = r(N)
+    local N_tot = `N_G0' + `N_G1'
+
+    // m=2: balance both groups toward pooled (the default and paper-preferred)
+    // m=1: balance group 1 toward group 0  (ATT for G=0)
+    // m=0: balance group 0 toward group 1  (ATT for G=1)
+    qui replace `ipw_var' = .
+    if `m' == 2 {
+      qui replace `ipw_var' = (`N_G1' / `N_tot') / `pscore_var'         if `sgroup' == 1 & !mi(`pscore_var')
+      qui replace `ipw_var' = (`N_G0' / `N_tot') / (1 - `pscore_var')   if `sgroup' == 0 & !mi(`pscore_var')
+    }
+    else if `m' == 1 {
+      qui replace `ipw_var' = (1 - `pscore_var') / `pscore_var'         if `sgroup' == 1 & !mi(`pscore_var')
+      qui replace `ipw_var' = 1                                          if `sgroup' == 0
+    }
+    else if `m' == 0 {
+      qui replace `ipw_var' = `pscore_var' / (1 - `pscore_var')          if `sgroup' == 0 & !mi(`pscore_var')
+      qui replace `ipw_var' = 1                                          if `sgroup' == 1
+    }
+    else {
+      di as error "m() must be 0, 1, or 2 (got `m')."
+      exit 198
+    }
+    // Replace NAs in ipw with 0 so they drop out of the regression
+    qui replace `ipw_var' = 0 if mi(`ipw_var')
+  }
+
+  if "`bootstrap'" != "nobootstrap" {
+    di as text ///
+"Note: bootstrap inference in DiD mode is not yet implemented in this Stata build. Analytical cluster-robust SEs are reported instead."
+  }
+
+  // ── Estimate: long-form TWFE with unit FE absorbed via xtreg, fe.
+  // Weights enter as pweights so SE machinery is consistent with sampling-
+  // weight semantics.  When noipsw / no balance, ipw_var is identically 1.
+  qui xtset `unit'
+  local rhs `G0_Z' `G1_Z' `G0_post' `G1_post' `g0_covs' `g1_covs'
+  xtreg `depvar' `rhs' [pw=`ipw_var'] if `touse' & `ipw_var' > 0, fe vce(cluster `unit')
+
+  // ── Extract coefficients of interest
+  scalar b_g0   = _b[`G0_Z']
+  scalar b_g1   = _b[`G1_Z']
+  scalar b_diff = b_g1 - b_g0
+  scalar se_g0  = _se[`G0_Z']
+  scalar se_g1  = _se[`G1_Z']
+  // SE of the difference via the post-estimation vcov
+  matrix V = e(V)
+  local idx_g0 = colnumb(V, "`G0_Z'")
+  local idx_g1 = colnumb(V, "`G1_Z'")
+  scalar cov_01  = V[`idx_g0', `idx_g1']
+  scalar se_diff = sqrt(se_g0^2 + se_g1^2 - 2*cov_01)
+
+  scalar t_g0   = b_g0   / se_g0
+  scalar t_g1   = b_g1   / se_g1
+  scalar t_diff = b_diff / se_diff
+
+  // df for analytical inference: from xtreg's degrees of freedom
+  scalar df = e(df_r)
+  scalar p_g0   = 2*ttail(df, abs(t_g0))
+  scalar p_g1   = 2*ttail(df, abs(t_g1))
+  scalar p_diff = 2*ttail(df, abs(t_diff))
+  scalar ci_lb_g0   = b_g0   + invttail(df, 0.975)*se_g0
+  scalar ci_ub_g0   = b_g0   + invttail(df, 0.025)*se_g0
+  scalar ci_lb_g1   = b_g1   + invttail(df, 0.975)*se_g1
+  scalar ci_ub_g1   = b_g1   + invttail(df, 0.025)*se_g1
+  scalar ci_lb_diff = b_diff + invttail(df, 0.975)*se_diff
+  scalar ci_ub_diff = b_diff + invttail(df, 0.025)*se_diff
+
+  // ── Cluster bootstrap (refit PS per rep; Q1 + Q3 + Q4).
+  // Whole units are resampled with replacement; fresh unit IDs are assigned
+  // by bsample's idcluster() option so unit FE remain identified across
+  // duplicate draws (the Cameron-Gelbach-Miller recipe).  The analytical
+  // SE/CI/p scalars set above are overridden with bootstrap-based values.
+  scalar B_ok    = 0
+  scalar N_clust = .
+  scalar use_bootstrap = ("`bootstrap'" != "nobootstrap")
+  if use_bootstrap {
+    qui levelsof `unit' if `touse', local(_clusters)
+    scalar N_clust = `: word count `_clusters''
+    if N_clust < 30 {
+      di as text ///
+"Note: cluster bootstrap with " as result %4.0f N_clust as text " clusters.  Pairs-cluster bootstrap can substantially understate SEs at < ~30 clusters.  Consider supplementing with a wild cluster bootstrap-t (Stata: boottest)."
+    }
+    tempfile _wsga_did_panel
+    qui save `_wsga_did_panel'
+
+    tempname _wsga_did_draws
+    matrix `_wsga_did_draws' = J(`bsreps', 2, .)
+
+    display as text "Cluster bootstrap (`bsreps' reps):"
+    forvalues _b = 1/`bsreps' {
+      qui use `_wsga_did_panel', clear
+      capture {
+        qui bsample, cluster(`unit') idcluster(_wsga_new_unit)
+
+        tempvar _b_pscore _b_ipw
+        qui gen double `_b_pscore' = .
+        qui gen double `_b_ipw'    = 1
+        if "`ipsw'" != "noipsw" & `: list sizeof balance' > 0 {
+          if "`probit'" != "" qui probit `sgroup' `balance'
+          else                qui logit  `sgroup' `balance'
+          qui predict double _wsga_ps_b, pr
+          qui replace `_b_pscore' = _wsga_ps_b
+          qui drop _wsga_ps_b
+
+          tempvar _b_uf
+          qui by _wsga_new_unit (`sgroup'), sort: gen byte `_b_uf' = (_n == 1)
+          qui count if `_b_uf' & `sgroup' == 0 & !mi(`_b_pscore')
+          local _N0 = r(N)
+          qui count if `_b_uf' & `sgroup' == 1 & !mi(`_b_pscore')
+          local _N1 = r(N)
+          local _NT = `_N0' + `_N1'
+
+          qui replace `_b_ipw' = .
+          if `m' == 2 {
+            qui replace `_b_ipw' = (`_N1' / `_NT') / `_b_pscore'         if `sgroup' == 1 & !mi(`_b_pscore')
+            qui replace `_b_ipw' = (`_N0' / `_NT') / (1 - `_b_pscore')   if `sgroup' == 0 & !mi(`_b_pscore')
+          }
+          else if `m' == 1 {
+            qui replace `_b_ipw' = (1 - `_b_pscore') / `_b_pscore'        if `sgroup' == 1 & !mi(`_b_pscore')
+            qui replace `_b_ipw' = 1                                       if `sgroup' == 0
+          }
+          else {
+            qui replace `_b_ipw' = `_b_pscore' / (1 - `_b_pscore')        if `sgroup' == 0 & !mi(`_b_pscore')
+            qui replace `_b_ipw' = 1                                       if `sgroup' == 1
+          }
+          qui replace `_b_ipw' = 0 if mi(`_b_ipw')
+        }
+
+        qui xtset _wsga_new_unit
+        qui xtreg `depvar' `rhs' [pw=`_b_ipw'] if `_b_ipw' > 0, ///
+          fe vce(cluster _wsga_new_unit)
+        matrix `_wsga_did_draws'[`_b', 1] = _b[`G0_Z']
+        matrix `_wsga_did_draws'[`_b', 2] = _b[`G1_Z']
+        scalar B_ok = B_ok + 1
+      }
+      if mod(`_b', 10) == 0 | `_b' == `bsreps' di "  " %4.0f `_b' "/`bsreps'"
+    }
+    qui use `_wsga_did_panel', clear
+
+    if B_ok < 2 {
+      di as error "Cluster bootstrap produced fewer than 2 successful reps (got " B_ok ").  Try increasing bsreps or relaxing balance() / m()."
+      exit 498
+    }
+
+    // Aggregate: SEs, percentile CIs, (1+count)/(B+1) p-values
+    preserve
+    qui drop _all
+    qui svmat double `_wsga_did_draws', names(_draw)
+    qui keep if !mi(_draw1) & !mi(_draw2)
+    qui gen double _drawdiff = _draw2 - _draw1
+
+    qui summarize _draw1
+    scalar se_g0   = r(sd)
+    qui summarize _draw2
+    scalar se_g1   = r(sd)
+    qui summarize _drawdiff
+    scalar se_diff = r(sd)
+    scalar t_g0   = b_g0   / se_g0
+    scalar t_g1   = b_g1   / se_g1
+    scalar t_diff = b_diff / se_diff
+
+    if "`normal'" != "" {
+      // Normal approximation with bootstrap SE
+      scalar p_g0      = 2*(1 - normal(abs(t_g0)))
+      scalar p_g1      = 2*(1 - normal(abs(t_g1)))
+      scalar p_diff    = 2*(1 - normal(abs(t_diff)))
+      scalar ci_lb_g0   = b_g0   - invnormal(0.975)*se_g0
+      scalar ci_ub_g0   = b_g0   + invnormal(0.975)*se_g0
+      scalar ci_lb_g1   = b_g1   - invnormal(0.975)*se_g1
+      scalar ci_ub_g1   = b_g1   + invnormal(0.975)*se_g1
+      scalar ci_lb_diff = b_diff - invnormal(0.975)*se_diff
+      scalar ci_ub_diff = b_diff + invnormal(0.975)*se_diff
+    }
+    else {
+      // Empirical percentile CIs and (1+count)/(B+1) p-values
+      qui _pctile _draw1,    percentiles(2.5 97.5)
+      scalar ci_lb_g0    = r(r1)
+      scalar ci_ub_g0    = r(r2)
+      qui _pctile _draw2,    percentiles(2.5 97.5)
+      scalar ci_lb_g1    = r(r1)
+      scalar ci_ub_g1    = r(r2)
+      qui _pctile _drawdiff, percentiles(2.5 97.5)
+      scalar ci_lb_diff  = r(r1)
+      scalar ci_ub_diff  = r(r2)
+
+      qui count if abs(_draw1)    >= abs(b_g0)
+      scalar p_g0    = (1 + r(N)) / (B_ok + 1)
+      qui count if abs(_draw2)    >= abs(b_g1)
+      scalar p_g1    = (1 + r(N)) / (B_ok + 1)
+      qui count if abs(_drawdiff) >= abs(b_diff)
+      scalar p_diff  = (1 + r(N)) / (B_ok + 1)
+    }
+    restore
+  }
+
+  // ── Display
+  local _stat_label = cond(use_bootstrap, "z", "t")
+  local _p_label    = cond(use_bootstrap, "P>|z|", "P>|t|")
+  local _ci_tag     = cond(use_bootstrap & "`normal'" == "", " (emp.)", "")
+  di
+  di as text "DiD subgroup analysis  |  unit: " as result "`unit'" ///
+     as text "  |  time: " as result "`time'" ///
+     as text "  |  post = " as result "`post_value'"
+  di
+  di as text "{hline 13}{c TT}{hline 64}"
+  di as text %12s abbrev("`depvar'",12) " {c |}" ///
+    _col(15) "{ralign 11:Coef.}" ///
+    _col(26) "{ralign 12:Std. Err.}" ///
+    _col(38) "{ralign 8:`_stat_label' }" ///
+    _col(46) "{ralign 8:`_p_label'}" ///
+    _col(54) "{ralign 25:[95% Conf. Interval`_ci_tag']}"
+  di as text "{hline 13}{c +}{hline 64}"
+  di as text "Subgroup" _col(14) "{c |}"
+  forvalues g = 0/1 {
+    display as text %12s abbrev("`g'",12) " {c |}" ///
+      as result ///
+      "  " %9.0g b_g`g' ///
+      "  " %9.0g se_g`g' ///
+      "    " %5.2f t_g`g' ///
+      "   " %5.3f p_g`g' ///
+      "    " %9.0g ci_lb_g`g' ///
+      "   " %9.0g ci_ub_g`g'
+  }
+  di as text "{hline 13}{c +}{hline 64}"
+  display as text "Difference   {c |}" ///
+    as result ///
+    "  " %9.0g b_diff ///
+    "  " %9.0g se_diff ///
+    "    " %5.2f t_diff ///
+    "   " %5.3f p_diff ///
+    "    " %9.0g ci_lb_diff ///
+    "   " %9.0g ci_ub_diff
+  di as text "{hline 13}{c BT}{hline 64}"
+
+  qui count if `touse' & `sgroup' == 0
+  scalar N_G0 = r(N)
+  qui count if `touse' & `sgroup' == 1
+  scalar N_G1 = r(N)
+  di as text "N (G=0): " as result %4.0f N_G0 ///
+     as text "   N (G=1): " as result %4.0f N_G1
+  if use_bootstrap {
+    di as text "Cluster bootstrap: " as result %4.0f B_ok ///
+       as text " / " as result `bsreps' ///
+       as text " reps, clustered on '" as result "`unit'" ///
+       as text "' (" as result %4.0f N_clust as text " clusters)"
+  }
+
+  // ── Balance tables (aggregate + treated-only).  Per Q9a, in DiD mode
+  // balance is reported both on the full active sample and conditional on
+  // treat == 1 — the paper recommends checking the treated-only table since
+  // the parallel-trends assumption is on the treated.
+  if `: list sizeof balance' > 0 {
+    forvalues _bidx = 1/2 {
+      tempvar _bal_mask
+      if `_bidx' == 1 {
+        qui gen byte `_bal_mask' = `touse'
+        local _bal_label "Aggregate"
+      }
+      else {
+        qui gen byte `_bal_mask' = `touse' & (`treat' == 1)
+        local _bal_label "Treated-only (D = 1)"
+      }
+      forvalues _widx = 1/2 {
+        if `_widx' == 2 & "`ipsw'" == "noipsw" continue
+        tempvar _bal_wt
+        if `_widx' == 1 {
+          qui gen byte `_bal_wt' = 1
+          local _bal_wlabel "Unweighted"
+        }
+        else {
+          qui gen double `_bal_wt' = `ipw_var'
+          local _bal_wlabel "IPW-weighted"
+        }
+        di
+        di as text "`_bal_label' balance ({txt}`_bal_wlabel'):"
+        di as text "{hline 13}{c TT}{hline 44}"
+        di as text "{ralign 12:Variable}  {c |}" ///
+          _col(17) "{ralign 11:Mean G0}" ///
+          _col(30) "{ralign 11:Mean G1}" ///
+          _col(42) "{ralign 9:Std diff}" ///
+          _col(54) "{ralign 8:p-value}"
+        di as text "{hline 13}{c +}{hline 44}"
+        foreach _v of local balance {
+          qui sum `_v' [aw=`_bal_wt'] if `_bal_mask' & `sgroup' == 0, meanonly
+          scalar _m0 = r(mean)
+          qui sum `_v' [aw=`_bal_wt'] if `_bal_mask' & `sgroup' == 1, meanonly
+          scalar _m1 = r(mean)
+          qui sum `_v' if `_bal_mask'
+          scalar _sd = r(sd)
+          scalar _sdiff = cond(_sd > 0, (_m1 - _m0)/_sd, 0)
+          qui reg `_v' `sgroup' [pw=`_bal_wt'] if `_bal_mask'
+          scalar _pv = 2*ttail(e(df_r), abs(_b[`sgroup']/_se[`sgroup']))
+          di as text "{ralign 12:`_v'}  {c |}" ///
+            _col(17) as result %11.0g _m0 ///
+            _col(30) %11.0g _m1 ///
+            _col(42) %9.4f _sdiff ///
+            _col(54) %8.4f _pv
+        }
+        di as text "{hline 13}{c BT}{hline 44}"
+      }
+    }
+  }
+end
+
+********************************************************************************
 
 /*
 CHANGE LOG
+1.3
+  - Add design(did) path: sharp 2-period DiD-SGA via xtreg, fe with
+    cluster-robust SEs (TWFE design matrix: subgroup-interacted unit FE
+    is absorbed; G0_Z = G0*D*post and G1_Z = G1*D*post are the
+    coefficients of interest).  IPW, balance tables, and the pairs
+    cluster bootstrap will follow in subsequent patches; the
+    corresponding options are accepted but trigger a one-line note.
 1.2
   - Rename command: rddsga -> wsga (Weighted Subgroup Analysis)
   - rddsga retained as deprecated alias (separate .ado / .sthlp)
