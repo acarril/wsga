@@ -1,0 +1,22 @@
+DESCRIPTION
+  s_d0adfd0dca039d::t_6922e4b47c4699 3
+NEWS.md
+  s_d0adfd0dca039d::t_ab2fc1842f8f36 40
+  s_d0adfd0dca039d::t_b45d8168cd07a0 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.6",
+  "base_commit_sha": "d24848b536cfd536dd096e9638380b50aeb7e68b",
+  "prompts": {},
+  "sessions": {
+    "s_d0adfd0dca039d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b5938a8f-790d-4ad8-a893-dbcf10bc7796",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
