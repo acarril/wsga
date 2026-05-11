@@ -1,21 +1,26 @@
 {smcl}
-{* *! version 1.2.0 2026-05-09}{...}
+{* *! version 1.3.0 2026-05-11}{...}
 {title:Title}
 
 {pstd}
-{hi:rddsga} {hline 2} Deprecated alias for {cmd:wsga}
+{hi:rddsga} {hline 2} Removed alias (previously deprecated)
 
 
 {title:Description}
 
 {pstd}
-{cmd:rddsga} is the previous name of {cmd:wsga} (Weighted Subgroup Analysis). It is retained as a deprecated alias and will be removed in a future major release. New code should call {cmd:wsga} directly.
+{cmd:rddsga} has been removed. Use {cmd:wsga rdd} instead.
 
 {pstd}
-The deprecated alias forwards all arguments unchanged to {cmd:wsga} after printing a one-line deprecation notice. Estimation results are identical.
+Note: the running variable is now a named option rather than the second
+positional variable in the varlist:
+
+{phang2}
+{cmd:wsga rdd} {it:depvar} [{it:covariates}]{cmd:,}
+{opt sgroup(varname)} {opt running(varname)} {opt bwidth(#)} [...]
 
 
 {title:See also}
 
 {pstd}
-{help wsga}
+{help wsga}, {help wsga rdd}
