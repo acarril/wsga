@@ -85,17 +85,23 @@ run_model <- function(dm, weights, active, model = c("rf", "fs", "iv"),
     # Strip the "X" prefix lm adds to column names
     names(fit$coefficients) <- colnames(X)
 
+    # Some design columns may be perfectly collinear with others (typical
+    # in DiD: time-invariant covariates × G are aliased by unit FE).  lm()
+    # sets those coefficients to NA and sandwich returns a vcov of the
+    # smaller, non-aliased rank.  Align names accordingly.
+    non_aliased_names <- names(fit$coefficients)[!is.na(fit$coefficients)]
+
     if (vce == "cluster" && !is.null(cluster_var)) {
       vcov_fit <- sandwich::vcovCL(fit, cluster = cluster_var[active])
     } else {
       vcov_fit <- sandwich::vcovHC(fit, type = vce)
     }
-    rownames(vcov_fit) <- colnames(vcov_fit) <- colnames(X)
+    rownames(vcov_fit) <- colnames(vcov_fit) <- non_aliased_names
 
     return(list(fit = fit, vcov_fit = vcov_fit,
                 coef_g0_name = dm$coef_g0_name,
                 coef_g1_name = dm$coef_g1_name,
-                coef_names   = colnames(X)))
+                coef_names   = non_aliased_names))
   }
 
   # IV (2SLS) ─────────────────────────────────────────────────────────────────
@@ -160,6 +166,10 @@ run_model <- function(dm, weights, active, model = c("rf", "fs", "iv"),
 #' @noRd
 extract_estimates <- function(model_result, df_resid = NULL, use_normal = FALSE) {
   b <- model_result$fit$coefficients
+  # Drop aliased entries (NA coefficients) so lengths align with the vcov
+  # returned by sandwich.  G0_Z / G1_Z are never aliased so the lookups
+  # below remain valid.
+  b <- b[!is.na(b)]
   names(b) <- model_result$coef_names
   V <- model_result$vcov_fit
   dimnames(V) <- list(model_result$coef_names, model_result$coef_names)
