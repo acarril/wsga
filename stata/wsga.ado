@@ -104,7 +104,7 @@ if "`dibalance'" != ""  & `: list sizeof varlist'<=2 & `: list sizeof balance'==
 
 
 // Issue warning if options bsreps and normal are specified along with nobootstrap
-if "`bootstrap'" == "nobootstrap" & (`bsreps' != 50 | "`normal'" != "") {
+if "`bootstrap'" == "nobootstrap" & (`bsreps' != 200 | "`normal'" != "") {
   di as text "Warning: options " as result "bsreps" as text " and " as result "normal" ///
     as text " are irrelevant if " as result "nobootstrap" as text " is specified"
 }
@@ -188,7 +188,7 @@ local rbalance=0 // mean in cutoff
 *tempvar cutoffvar
 *gen _cutoff = (`assignvar'>`cutoff')
 *lab var _cutoff "fuzzy"
-confirm new variable _cutoff
+cap drop _cutoff
 gen _cutoff = (`assignvar'>`cutoff')
 
 // Compute spline options
@@ -872,30 +872,6 @@ program define _wsga_rdd_myboo, eclass
   ereturn local vcetype "Bootstrap"
   ereturn local vce "bootstrap"
   ereturn local prefix "bootstrap"
-end
-
-*-------------------------------------------------------------------------------
-* nlcompost: modify b matrix after nlcom
-*-------------------------------------------------------------------------------
-program _wsga_rdd_nlcompost, eclass
-  matrix b = e(b)
-  matrix colnames b = Difference 
-  ereturn repost b = b, rename // renames V matrix as well
-end
-
-*-------------------------------------------------------------------------------
-* nlcomhack: hack b and V matrices to inlude nlcom results
-*-------------------------------------------------------------------------------
-program _wsga_rdd_nlcomhack, eclass
-  tempname b V nlcom_V
-  matrix `b' = e(b)
-  matrix `V' = e(V)
-  local i = colnumb(`b', "_nl_1")
-  qui nlcom _b[1.`1'#1.`2'] - _b[0.`1'#1.`2']
-  matrix `nlcom_V' = r(V) // for some reason this is necessary
-  matrix `b'[1,`i'] = r(b)
-  matrix `V'[`i',`i'] = `nlcom_V'[1,1] // ...and this
-  ereturn repost b = `b' V = `V'
 end
 
 
