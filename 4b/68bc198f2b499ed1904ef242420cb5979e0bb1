@@ -1,0 +1,27 @@
+tests/testthat/test-bootstrap.R
+  s_94dd97687f5fd4::t_7f3c2f1fe9b07f 40-65
+R/bootstrap.R
+  s_94dd97687f5fd4::t_22deff74bfac07 195
+stata/wsga.sthlp
+  s_94dd97687f5fd4::t_d157bdd05f2cc6 220-222
+stata/wsga.ado
+  s_94dd97687f5fd4::t_112bc7b2f1342f 838,844,854
+  s_94dd97687f5fd4::t_c2b486d1a0d576 1473,1475,1477
+  s_94dd97687f5fd4::t_e5d23c5a33b50a 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.6",
+  "base_commit_sha": "4b68bc198f2b499ed1904ef242420cb5979e0bb1",
+  "prompts": {},
+  "sessions": {
+    "s_94dd97687f5fd4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aef1dc70-65e2-442a-9c58-6faafc5e3ad1",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
