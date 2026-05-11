@@ -588,9 +588,9 @@ if "`ivregress'" != "" | "`reducedform'" != "" | "`firststage'" != "" {
     di as text %12s abbrev("`depvar'",12) " {c |}" ///
       _col(15) "{ralign 11:Coef.}" ///
       _col(26) "{ralign 12:Std. Err.}" ///
-      _col(38) "{ralign 8:t }" /// notice extra space
-      _col(46) "{ralign 8:P>|t|}" ///
-      _col(54) "{ralign 25:[95% Conf. Interval]}" 
+      _col(38) "{ralign 8:z }" /// notice extra space
+      _col(46) "{ralign 8:P>|z|}" ///
+      _col(54) "{ralign 25:[95% Conf. Interval]}"
     di as text "{hline 13}{c +}{hline 64}"
     di as text "Subgroup" _col(14) "{c |}"
     forvalues g = 0/1 {
