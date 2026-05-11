@@ -1,0 +1,22 @@
+stata/wsga_did.sthlp
+  s_0b1584b02571f7::t_625bf26f919335 76-78,80,83-84,92-94,106,108-109,119-126
+  s_0b1584b02571f7::t_2e23f85c6528e7 2
+  s_0b1584b02571f7::t_97cf07c3235d07 3
+  s_0b1584b02571f7::t_dc87ea87d50eac 75,79,81-82,85-91,95-105,107,110-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.6",
+  "base_commit_sha": "6cf76b844b1bf5cc173e31573df34d7f973e5e1d",
+  "prompts": {},
+  "sessions": {
+    "s_0b1584b02571f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a3299ef9-c4bb-4fc2-946d-d2e118b6054e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
