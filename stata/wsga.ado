@@ -1393,6 +1393,62 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   scalar N_G1 = r(N)
   di as text "N (G=0): " as result %4.0f N_G0 ///
      as text "   N (G=1): " as result %4.0f N_G1
+
+  // ── Balance tables (aggregate + treated-only).  Per Q9a, in DiD mode
+  // balance is reported both on the full active sample and conditional on
+  // treat == 1 — the paper recommends checking the treated-only table since
+  // the parallel-trends assumption is on the treated.
+  if `: list sizeof balance' > 0 {
+    forvalues _bidx = 1/2 {
+      tempvar _bal_mask
+      if `_bidx' == 1 {
+        qui gen byte `_bal_mask' = `touse'
+        local _bal_label "Aggregate"
+      }
+      else {
+        qui gen byte `_bal_mask' = `touse' & (`treat' == 1)
+        local _bal_label "Treated-only (D = 1)"
+      }
+      forvalues _widx = 1/2 {
+        if `_widx' == 2 & "`ipsw'" == "noipsw" continue
+        tempvar _bal_wt
+        if `_widx' == 1 {
+          qui gen byte `_bal_wt' = 1
+          local _bal_wlabel "Unweighted"
+        }
+        else {
+          qui gen double `_bal_wt' = `ipw_var'
+          local _bal_wlabel "IPW-weighted"
+        }
+        di
+        di as text "`_bal_label' balance ({txt}`_bal_wlabel'):"
+        di as text "{hline 13}{c TT}{hline 44}"
+        di as text "{ralign 12:Variable}  {c |}" ///
+          _col(17) "{ralign 11:Mean G0}" ///
+          _col(30) "{ralign 11:Mean G1}" ///
+          _col(42) "{ralign 9:Std diff}" ///
+          _col(54) "{ralign 8:p-value}"
+        di as text "{hline 13}{c +}{hline 44}"
+        foreach _v of local balance {
+          qui sum `_v' [aw=`_bal_wt'] if `_bal_mask' & `sgroup' == 0, meanonly
+          scalar _m0 = r(mean)
+          qui sum `_v' [aw=`_bal_wt'] if `_bal_mask' & `sgroup' == 1, meanonly
+          scalar _m1 = r(mean)
+          qui sum `_v' if `_bal_mask'
+          scalar _sd = r(sd)
+          scalar _sdiff = cond(_sd > 0, (_m1 - _m0)/_sd, 0)
+          qui reg `_v' `sgroup' [pw=`_bal_wt'] if `_bal_mask'
+          scalar _pv = 2*ttail(e(df_r), abs(_b[`sgroup']/_se[`sgroup']))
+          di as text "{ralign 12:`_v'}  {c |}" ///
+            _col(17) as result %11.0g _m0 ///
+            _col(30) %11.0g _m1 ///
+            _col(42) %9.4f _sdiff ///
+            _col(54) %8.4f _pv
+        }
+        di as text "{hline 13}{c BT}{hline 44}"
+      }
+    }
+  }
 end
 
 ********************************************************************************
