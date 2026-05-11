@@ -3,24 +3,40 @@
 #' @importFrom Formula Formula
 NULL
 
-#' Weighted Subgroup Analysis in Regression Discontinuity Designs
+#' Weighted Subgroup Analysis
 #'
-#' Estimates per-subgroup RD treatment effects and their difference using
+#' Estimates per-subgroup treatment effects and their difference using
 #' inverse probability weighting (IPW) to balance observed moderators across
-#' subgroups at the cutoff. Supports sharp and fuzzy RD designs, multiple
-#' kernel types, polynomial order selection, three IPW weighting modes, common
-#' support trimming, and bootstrap inference.
+#' subgroups. Two designs are supported:
+#' - **Regression discontinuity** (`design = "rdd"`, default): sharp and
+#'   fuzzy RD, local polynomial regression with kernel weights.
+#' - **Difference-in-differences** (`design = "did"`): sharp 2-period DiD
+#'   with long-form TWFE (unit + time fixed effects, fully interacted by
+#'   subgroup).
 #'
 #' @param formula A two-part `Formula` of the form
 #'   `outcome ~ covariates | subgroup`. The left of `|` contains covariates
 #'   included in the outcome regression; the right of `|` is the binary (0/1)
 #'   subgroup indicator. If there are no covariates, write `outcome ~ 1 | subgroup`.
-#' @param data A data frame.
+#' @param data A data frame. For `design = "did"`, in long format (one row
+#'   per unit-time).
+#' @param design Character: `"rdd"` (default) or `"did"`.
 #' @param running A one-sided formula (e.g. `~ score`) or a character string
-#'   naming the running variable column in `data`.
-#' @param cutoff Numeric cutoff value. The running variable is internally
-#'   centered: `x_c = running - cutoff`. Default `0`.
-#' @param bwidth Positive numeric half-bandwidth. Required.
+#'   naming the running variable column in `data`. Required when
+#'   `design = "rdd"`.
+#' @param cutoff Numeric cutoff value (`design = "rdd"`). The running
+#'   variable is internally centered: `x_c = running - cutoff`. Default `0`.
+#' @param bwidth Positive numeric half-bandwidth (`design = "rdd"`). Required.
+#' @param unit Character: name of the unit identifier column.
+#'   Required when `design = "did"`.
+#' @param time Character: name of the time variable column.
+#'   Required when `design = "did"`. Must have exactly 2 unique non-missing
+#'   values.
+#' @param treat Character: name of the binary (0/1) treatment-group indicator
+#'   (constant within unit). Required when `design = "did"`.
+#' @param post_value Optional value of `time` that denotes the post period.
+#'   Default: `max(time)` for numeric/Date columns, or the second factor
+#'   level otherwise.
 #' @param model Character: estimation model.
 #'   - `"rf"` (default): reduced form (sharp RD or reduced form of fuzzy RD).
 #'   - `"fs"`: first stage of fuzzy RD (outcome is the treatment indicator).
@@ -141,9 +157,14 @@ NULL
 #' @export
 wsga <- function(formula,
                    data,
-                   running,
+                   design      = c("rdd", "did"),
+                   running     = NULL,
                    cutoff      = 0,
-                   bwidth,
+                   bwidth      = NULL,
+                   unit        = NULL,
+                   time        = NULL,
+                   treat       = NULL,
+                   post_value  = NULL,
                    model       = c("rf", "fs", "iv"),
                    fuzzy       = NULL,
                    p           = 1L,
@@ -169,17 +190,34 @@ wsga <- function(formula,
   cl <- match.call()
 
   # ── 1. Argument validation ──────────────────────────────────────────────────
+  design   <- match.arg(design)
   model    <- match.arg(model)
   kernel   <- match.arg(kernel)
   ps_model <- match.arg(ps_model)
-  if (missing(bwidth) || !is.numeric(bwidth) || bwidth <= 0)
-    stop("`bwidth` must be a positive number.")
   if (!m %in% c(0L, 1L, 2L))
     stop("`m` must be 0, 1, or 2.")
-  if (model %in% c("fs", "iv") && is.null(fuzzy))
-    stop("`fuzzy` must be specified when model = '", model, "'.")
   if (!is.data.frame(data))
     stop("`data` must be a data frame.")
+
+  if (design == "rdd") {
+    if (is.null(running))
+      stop("`running` is required when `design = \"rdd\"`.")
+    if (is.null(bwidth) || !is.numeric(bwidth) || bwidth <= 0)
+      stop("`bwidth` must be a positive number (required for `design = \"rdd\"`).")
+    if (model %in% c("fs", "iv") && is.null(fuzzy))
+      stop("`fuzzy` must be specified when model = '", model, "'.")
+  } else {  # design == "did"
+    if (is.null(unit) || is.null(time) || is.null(treat))
+      stop("`design = \"did\"` requires `unit`, `time`, and `treat`.")
+    if (model != "rf") {
+      stop("Fuzzy DiD is not currently supported; the paper's DiD identification ",
+           "(Carril et al., \"Subgroup effect identification in DiD designs\") covers ",
+           "sharp DiD only. If you have imperfect compliance with treatment in a panel ",
+           "setting, consider this design out of scope for this package.")
+    }
+    # RDD-only knobs that have no meaning in DiD: warn quietly if user passed them
+    # explicitly (we can't detect missing-vs-default cleanly, so just ignore).
+  }
 
   # Resolve `inference`. Three modes; default depends on `bootstrap`.
   inference <- if (is.null(inference)) {
@@ -204,17 +242,20 @@ wsga <- function(formula,
   if (length(sgroup_name) != 1)
     stop("The right-hand side of `|` must name exactly one subgroup variable.")
 
-  # Running variable
-  running_name <- if (inherits(running, "formula")) {
-    all.vars(running)[[1]]
-  } else {
-    as.character(running)
-  }
+  # Running variable (RDD)
+  running_name <- if (design == "rdd") {
+    if (inherits(running, "formula")) all.vars(running)[[1]] else as.character(running)
+  } else NULL
 
-  # Fuzzy treatment
+  # Fuzzy treatment (RDD only)
   fuzzy_name <- if (!is.null(fuzzy)) {
     if (inherits(fuzzy, "formula")) all.vars(fuzzy)[[1]] else as.character(fuzzy)
   } else NULL
+
+  # DiD identifier names
+  unit_name  <- if (design == "did") as.character(unit) else NULL
+  time_name  <- if (design == "did") as.character(time) else NULL
+  treat_name <- if (design == "did") as.character(treat) else NULL
 
   # Balance variables
   if (!is.null(balance)) {
@@ -228,27 +269,66 @@ wsga <- function(formula,
     if (is.character(weights)) data[[weights]] else weights
   } else NULL
 
-  # Cluster variable
+  # Cluster variable.  In DiD, default to `unit` when not specified (Q2).
+  if (design == "did" && is.null(cluster_var)) cluster_var <- unit_name
   clust <- if (!is.null(cluster_var)) data[[cluster_var]] else NULL
 
-  # ── 3. Extract vectors ───────────────────────────────────────────────────────
-  y  <- data[[outcome_name]]
-  x  <- data[[running_name]] - cutoff   # center at cutoff
-  G  <- data[[sgroup_name]]
-  D  <- if (!is.null(fuzzy_name)) data[[fuzzy_name]] else NULL
+  # For DiD with a cluster variable in play, the analytical SE should be
+  # cluster-robust.  If the user left `vce` at its package default ("HC1")
+  # — i.e., didn't ask for something specific — switch it to "cluster" so
+  # `inference = "analytical"` doesn't silently report HC1 SEs that
+  # under-estimate clustered variance.
+  if (design == "did" && !is.null(cluster_var) && identical(vce, "HC1")) {
+    vce <- "cluster"
+  }
 
+  # DiD-specific validation (Q9b): runs the unit-constancy checks, the
+  # 2-period requirement, and unbalanced-panel warning.  Also resolves the
+  # post period.
+  if (design == "did") {
+    did_val <- validate_did_data(
+      data, unit = unit_name, time = time_name, treat = treat_name,
+      sgroup = sgroup_name, balance = balance_names,
+      cluster_var = cluster_var, post_value = post_value
+    )
+    post_value <- did_val$post_value
+  }
+
+  # ── 3. Extract vectors ───────────────────────────────────────────────────────
+  y <- data[[outcome_name]]
+  G <- data[[sgroup_name]]
   if (!all(G %in% c(0, 1, NA)))
     stop("Subgroup variable must be binary (0/1).")
-
   sgroup0 <- as.integer(G == 0)
-  Z       <- as.integer(x > 0)           # treatment assignment
+
+  if (design == "rdd") {
+    x  <- data[[running_name]] - cutoff
+    D  <- if (!is.null(fuzzy_name)) data[[fuzzy_name]] else NULL
+    Z  <- as.integer(x > 0)
+  } else {  # did
+    x  <- NULL
+    D  <- data[[treat_name]]
+    post_vec <- as.integer(data[[time_name]] == post_value)
+    Z  <- D * post_vec   # serves as the "treatment indicator" for downstream
+  }
 
   # ── 4. Sample masks ─────────────────────────────────────────────────────────
-  touse    <- !is.na(y) & !is.na(x) & !is.na(G)
-  within_bw <- abs(x) < bwidth
+  if (design == "rdd") {
+    touse     <- !is.na(y) & !is.na(x) & !is.na(G)
+    within_bw <- abs(x) < bwidth
+  } else {
+    touse     <- !is.na(y) & !is.na(data[[time_name]]) & !is.na(G) &
+                 !is.na(data[[treat_name]]) & !is.na(data[[unit_name]])
+    within_bw <- rep(TRUE, nrow(data))
+  }
 
-  # ── 5. Kernel weights ───────────────────────────────────────────────────────
-  kwt <- kernel_weights(x, bwidth, kernel, obs_weights)
+  # ── 5. Kernel weights (RDD only; DiD uses unit weights of 1 × obs_wt) ───────
+  if (design == "rdd") {
+    kwt <- kernel_weights(x, bwidth, kernel, obs_weights)
+  } else {
+    kwt <- if (is.null(obs_weights)) rep(1, nrow(data))
+           else as.numeric(obs_weights)
+  }
 
   # ── 6. Propensity score + IPW ────────────────────────────────────────────────
   if (!noipsw && length(balance_names) > 0) {
@@ -289,84 +369,122 @@ wsga <- function(formula,
   # ── 7. Balance tables ────────────────────────────────────────────────────────
   balance_result <- NULL
   if (length(balance_names) > 0) {
-    # Unweighted balance (kernel weights only)
-    bal_unw <- compute_balance(
-      balance_names, data, running_name, G, sgroup0,
-      within_bw, touse,
-      weights    = replace(kwt * coerce_obs_wt(obs_weights, nrow(data)), !touse | !within_bw, 0),
-      comsup_idx = (touse & within_bw),
-      rbalance   = rbalance,
-      N_G0       = N_G0_unw,
-      N_G1       = N_G1_unw
-    )
+    # Helper: one balance-table computation for a given touse mask.
+    one_balance <- function(touse_mask, N_G0, N_G1, weighted_only = FALSE) {
+      # Effective rbalance — for DiD, only "mean in sample" makes sense
+      # (no cutoff to extrapolate to).
+      rb <- if (design == "rdd") rbalance else 1L
+      unw_w <- replace(kwt * coerce_obs_wt(obs_weights, nrow(data)),
+                       !touse_mask | !within_bw, 0)
+      bal_unw <- compute_balance(
+        balance_names, data, running_name, G, sgroup0,
+        within_bw, touse_mask,
+        weights    = unw_w,
+        comsup_idx = (touse_mask & within_bw),
+        rbalance   = rb,
+        N_G0       = N_G0,
+        N_G1       = N_G1
+      )
+      bal_ipsw <- NULL
+      if (!noipsw && !weighted_only) {
+        w_w <- replace(nweights * kwt / kwt,
+                       is.na(nweights) | !touse_mask | !within_bw | !comsup_idx, 0)
+        bal_ipsw <- compute_balance(
+          balance_names, data, running_name, G, sgroup0,
+          within_bw, touse_mask,
+          weights    = w_w,
+          comsup_idx = comsup_idx,
+          rbalance   = rb,
+          N_G0       = N_G0,
+          N_G1       = N_G1
+        )
+      }
+      list(unweighted = bal_unw, weighted = bal_ipsw)
+    }
+
+    bal_agg <- one_balance(touse, N_G0_unw, N_G1_unw)
 
     if (show_balance) {
       cat("\nUnweighted balance:\n")
-      print(bal_unw$table)
+      print(bal_agg$unweighted$table)
       cat(sprintf("N (G=0): %d   N (G=1): %d   Mean |std diff|: %.4f   F: %.3f   p: %.4f\n\n",
-                  bal_unw$N_G0, bal_unw$N_G1, bal_unw$avgdiff,
-                  bal_unw$Fstat, bal_unw$pval_global))
-    }
-
-    bal_ipsw <- NULL
-    if (!noipsw) {
-      bal_ipsw <- compute_balance(
-        balance_names, data, running_name, G, sgroup0,
-        within_bw, touse,
-        weights    = replace(nweights * kwt / kwt,  # nweights alone for iw
-                             is.na(nweights) | !touse | !within_bw | !comsup_idx, 0),
-        comsup_idx = comsup_idx,
-        rbalance   = rbalance,
-        N_G0       = N_G0_w,
-        N_G1       = N_G1_w
-      )
-
-      if (show_balance) {
+                  bal_agg$unweighted$N_G0, bal_agg$unweighted$N_G1,
+                  bal_agg$unweighted$avgdiff, bal_agg$unweighted$Fstat,
+                  bal_agg$unweighted$pval_global))
+      if (!is.null(bal_agg$weighted)) {
         cat("IPW-weighted balance:\n")
-        print(bal_ipsw$table)
+        print(bal_agg$weighted$table)
         cat(sprintf("N (G=0): %d   N (G=1): %d   Mean |std diff|: %.4f   F: %.3f   p: %.4f\n\n",
-                    bal_ipsw$N_G0, bal_ipsw$N_G1, bal_ipsw$avgdiff,
-                    bal_ipsw$Fstat, bal_ipsw$pval_global))
+                    bal_agg$weighted$N_G0, bal_agg$weighted$N_G1,
+                    bal_agg$weighted$avgdiff, bal_agg$weighted$Fstat,
+                    bal_agg$weighted$pval_global))
       }
     }
 
-    balance_result <- list(unweighted = bal_unw, weighted = bal_ipsw)
+    # DiD: also compute a balance table conditional on D = 1 (treated units only)
+    bal_trt <- NULL
+    if (design == "did") {
+      touse_t <- touse & (D == 1)
+      bal_trt <- one_balance(touse_t,
+                             N_G0 = sum(touse_t & G == 0),
+                             N_G1 = sum(touse_t & G == 1))
+    }
+
+    balance_result <- list(
+      unweighted = list(aggregate = bal_agg$unweighted, treated = bal_trt$unweighted),
+      weighted   = list(aggregate = bal_agg$weighted,   treated = bal_trt$weighted)
+    )
   }
 
   # ── 8. Design matrix + estimation ────────────────────────────────────────────
-  # For model = "fs", outcome is the fuzzy treatment variable
+  # For model = "fs" (RDD only), outcome is the fuzzy treatment variable
   outcome_for_model <- if (model == "fs") fuzzy_name else outcome_name
 
-  # Temporarily replace the outcome column if needed
-  data$.wsga_x <- x   # centered running variable
+  if (design == "rdd") {
+    # Temporarily attach the centered running variable
+    data$.wsga_x <- x
 
-  dm <- build_design_matrix(
-    data       = data,
-    outcome    = outcome_for_model,
-    running    = ".wsga_x",
-    Z          = Z,
-    G          = G,
-    covariates = covariate_names,
-    p          = p
-  )
-
-  fuzzy_data <- if (model == "iv") {
-    list(D = D, G = G, Z = Z)
-  } else NULL
-
-  # For fixed_fs bootstrap, save first-stage coefficients now
-  fs_coefs <- NULL
-  if (model == "iv" && fixed_fs) {
-    dm_fs <- build_design_matrix(
-      data = data, outcome = fuzzy_name, running = ".wsga_x",
-      Z = Z, G = G, covariates = covariate_names, p = p
+    dm <- build_rdd_design_matrix(
+      data       = data,
+      outcome    = outcome_for_model,
+      running    = ".wsga_x",
+      Z          = Z,
+      G          = G,
+      covariates = covariate_names,
+      p          = p
     )
-    fs_fit <- run_model(dm_fs, final_wt, active, model = "rf",
-                        vce = vce, cluster_var = clust)
-    fs_coefs <- c(
-      coef(fs_fit$fit)[fs_fit$coef_g0_name],
-      coef(fs_fit$fit)[fs_fit$coef_g1_name]
+
+    fuzzy_data <- if (model == "iv") {
+      list(D = D, G = G, Z = Z)
+    } else NULL
+
+    # For fixed_fs bootstrap, save first-stage coefficients now
+    fs_coefs <- NULL
+    if (model == "iv" && fixed_fs) {
+      dm_fs <- build_rdd_design_matrix(
+        data = data, outcome = fuzzy_name, running = ".wsga_x",
+        Z = Z, G = G, covariates = covariate_names, p = p
+      )
+      fs_fit <- run_model(dm_fs, final_wt, active, model = "rf",
+                          vce = vce, cluster_var = clust)
+      fs_coefs <- c(
+        coef(fs_fit$fit)[fs_fit$coef_g0_name],
+        coef(fs_fit$fit)[fs_fit$coef_g1_name]
+      )
+    }
+  } else {  # design == "did"
+    dm <- build_did_design_matrix(
+      data       = data,
+      outcome    = outcome_for_model,
+      unit       = unit_name,
+      time       = time_name,
+      post_value = post_value,
+      treat      = treat_name,
+      G          = G,
+      covariates = covariate_names
     )
+    fuzzy_data <- NULL
+    fs_coefs   <- NULL
   }
 
   model_result <- run_model(dm, final_wt, active, model,
@@ -384,10 +502,15 @@ wsga <- function(formula,
 
     # Closure capturing all configuration for one bootstrap replicate
     run_one_rep <- make_boot_rep(
+      design           = design,
       outcome_name     = outcome_for_model,
       running_name     = running_name,
       cutoff           = cutoff,
       bwidth           = bwidth,
+      unit_name        = unit_name,
+      time_name        = time_name,
+      treat_name       = treat_name,
+      post_value       = post_value,
       G_name           = sgroup_name,
       covariate_names  = covariate_names,
       balance_names    = balance_names,
@@ -423,7 +546,9 @@ wsga <- function(formula,
 
     boot_result <- run_bootstrap(run_one_rep, data, bsreps, point_est,
                                  cluster_var = cluster_var,
-                                 block_var = block_var, seed = seed)
+                                 block_var   = block_var,
+                                 unit_var    = if (design == "did") unit_name else NULL,
+                                 seed        = seed)
 
     # SE and t-statistics always come from the bootstrap when it runs.
     V_boot  <- boot_result$vcov
@@ -486,6 +611,7 @@ wsga <- function(formula,
       call          = cl,
       nobs          = nobs,
       outcome       = outcome_name,
+      design        = design,
       bwidth        = bwidth,
       cutoff        = cutoff,
       kernel        = kernel,
@@ -495,7 +621,11 @@ wsga <- function(formula,
       noipsw        = noipsw,
       inference     = inference,
       cluster_var_name = if (is.null(cluster_var)) NULL else cluster_var,
-      fixed_ps      = fixed_ps
+      fixed_ps      = fixed_ps,
+      unit_name     = unit_name,
+      time_name     = time_name,
+      treat_name    = treat_name,
+      post_value    = post_value
     ),
     class = "wsga"
   )
@@ -503,7 +633,10 @@ wsga <- function(formula,
 
 
 # ── Helper: build bootstrap-replicate closure ──────────────────────────────────
-make_boot_rep <- function(outcome_name, running_name, cutoff, bwidth,
+make_boot_rep <- function(design = "rdd",
+                          outcome_name, running_name, cutoff, bwidth,
+                          unit_name = NULL, time_name = NULL,
+                          treat_name = NULL, post_value = NULL,
                           G_name, covariate_names, balance_names,
                           obs_wt_name, obs_weights_vec,
                           kernel, noipsw, ps_model, comsup, m,
@@ -513,16 +646,26 @@ make_boot_rep <- function(outcome_name, running_name, cutoff, bwidth,
                           original_pscore = NULL,
                           original_comsup_idx = NULL) {
   function(data_b, orig_idx) {
-    x_b  <- data_b[[running_name]] - cutoff
     G_b  <- data_b[[G_name]]
     y_b  <- data_b[[outcome_name]]
-    Z_b  <- as.integer(x_b > 0)
+    obs_wt_b <- if (!is.null(obs_wt_name)) data_b[[obs_wt_name]] else obs_weights_vec
 
-    touse_b    <- !is.na(y_b) & !is.na(x_b) & !is.na(G_b)
-    within_b   <- abs(x_b) < bwidth
-    obs_wt_b   <- if (!is.null(obs_wt_name)) data_b[[obs_wt_name]] else obs_weights_vec
-
-    kwt_b <- kernel_weights(x_b, bwidth, kernel, obs_wt_b)
+    if (design == "rdd") {
+      x_b      <- data_b[[running_name]] - cutoff
+      Z_b      <- as.integer(x_b > 0)
+      touse_b  <- !is.na(y_b) & !is.na(x_b) & !is.na(G_b)
+      within_b <- abs(x_b) < bwidth
+      kwt_b    <- kernel_weights(x_b, bwidth, kernel, obs_wt_b)
+    } else {  # did
+      x_b      <- NULL
+      D_b      <- data_b[[treat_name]]
+      post_b   <- as.integer(data_b[[time_name]] == post_value)
+      Z_b      <- D_b * post_b
+      touse_b  <- !is.na(y_b) & !is.na(data_b[[time_name]]) & !is.na(G_b) &
+                  !is.na(D_b) & !is.na(data_b[[unit_name]])
+      within_b <- rep(TRUE, nrow(data_b))
+      kwt_b    <- if (is.null(obs_wt_b)) rep(1, nrow(data_b)) else as.numeric(obs_wt_b)
+    }
 
     if (!noipsw && length(balance_names) > 0) {
       if (fixed_ps) {
@@ -547,11 +690,11 @@ make_boot_rep <- function(outcome_name, running_name, cutoff, bwidth,
     }
 
     active_b <- touse_b & within_b & fw_b > 0
-    data_b$.wsga_x <- x_b
+    if (design == "rdd") data_b$.wsga_x <- x_b
 
-    if (model == "iv" && fixed_fs) {
+    if (design == "rdd" && model == "iv" && fixed_fs) {
       # Bootstrap reduced form and divide by saved FS coefficients
-      dm_b <- build_design_matrix(data_b, fuzzy_name, ".wsga_x",
+      dm_b <- build_rdd_design_matrix(data_b, fuzzy_name, ".wsga_x",
                                   Z_b, G_b, covariate_names, p)
       res_b <- run_model(dm_b, fw_b, active_b, "rf", vce = vce)
       bc    <- coef(res_b$fit)
@@ -562,9 +705,16 @@ make_boot_rep <- function(outcome_name, running_name, cutoff, bwidth,
     }
 
     outcome_b  <- if (model == "fs") fuzzy_name else outcome_name
-    fuzzy_b    <- if (model == "iv") list(D = data_b[[fuzzy_name]], G = G_b, Z = Z_b) else NULL
-    dm_b       <- build_design_matrix(data_b, outcome_b, ".wsga_x",
+    fuzzy_b    <- if (design == "rdd" && model == "iv") {
+      list(D = data_b[[fuzzy_name]], G = G_b, Z = Z_b)
+    } else NULL
+    if (design == "rdd") {
+      dm_b <- build_rdd_design_matrix(data_b, outcome_b, ".wsga_x",
                                       Z_b, G_b, covariate_names, p)
+    } else {
+      dm_b <- build_did_design_matrix(data_b, outcome_b, unit_name, time_name,
+                                      post_value, treat_name, G_b, covariate_names)
+    }
     clust_b    <- if (!is.null(cluster_var_name)) data_b[[cluster_var_name]] else NULL
     res_b      <- run_model(dm_b, fw_b, active_b, model,
                             fuzzy_data = fuzzy_b, vce = vce, cluster_var = clust_b)
@@ -580,6 +730,71 @@ coerce_obs_wt <- function(obs_weights, n) {
 }
 
 
+# ── Helper: DiD input validation ──────────────────────────────────────────────
+# Q9b checks. Returns the resolved `post_value` and an unbalanced-panel count.
+# Errors on hard violations; warns once on unbalanced panel.
+validate_did_data <- function(data, unit, time, treat, sgroup, balance,
+                              cluster_var, post_value) {
+  for (col in c(unit, time, treat, sgroup)) {
+    if (!col %in% names(data))
+      stop(sprintf("Column '%s' not found in `data`.", col))
+  }
+
+  # 1. time has exactly 2 unique non-missing values
+  t_vals <- unique(data[[time]][!is.na(data[[time]])])
+  if (length(t_vals) != 2L) {
+    stop(sprintf(
+      "`design = \"did\"` requires `time` ('%s') to have exactly 2 unique non-missing values; found %d. Staggered adoption is not currently supported.",
+      time, length(t_vals)))
+  }
+
+  # Resolve post_value (default = max(time); else must be one of the two)
+  if (is.null(post_value)) {
+    post_value <- if (is.numeric(t_vals) || inherits(t_vals, "Date")) {
+      max(t_vals)
+    } else {
+      sort(t_vals)[2L]
+    }
+  } else if (!post_value %in% t_vals) {
+    stop(sprintf("`post_value` (%s) is not in the unique values of `time` (%s).",
+                 as.character(post_value),
+                 paste(as.character(t_vals), collapse = ", ")))
+  }
+
+  # 2. Every unit appears in both periods (warn only)
+  per_unit_t <- tapply(data[[time]], data[[unit]],
+                       function(t) length(unique(t[!is.na(t)])))
+  unbalanced <- sum(per_unit_t < 2L)
+  if (unbalanced > 0L) {
+    warning(sprintf(
+      "Unbalanced panel: %d of %d units appear in only one period; they remain in the unit FE but do not contribute to the treatment-effect estimates.",
+      unbalanced, length(per_unit_t)))
+  }
+
+  # 3-6. unit-level constancy checks
+  check_unit_constant <- function(col, label) {
+    n_distinct <- tapply(data[[col]], data[[unit]],
+                         function(x) length(unique(x[!is.na(x)])))
+    bad <- names(n_distinct)[n_distinct > 1L]
+    if (length(bad) > 0L) {
+      ex <- paste(utils::head(bad, 3), collapse = ", ")
+      stop(sprintf(
+        "%s ('%s') varies within unit (offending units: %s%s). The DiD design requires this to be a unit-level characteristic.",
+        label, col, ex,
+        if (length(bad) > 3) sprintf(", and %d more", length(bad) - 3) else ""))
+    }
+  }
+  check_unit_constant(treat, "`treat`")
+  check_unit_constant(sgroup, "`sgroup`")
+  for (b in balance) check_unit_constant(b, sprintf("Balance moderator"))
+  if (!is.null(cluster_var) && cluster_var != unit) {
+    check_unit_constant(cluster_var, "`cluster_var`")
+  }
+
+  list(post_value = post_value, unbalanced = unbalanced)
+}
+
+
 # ── S3 methods ────────────────────────────────────────────────────────────────
 
 #' @export
@@ -592,8 +807,13 @@ print.wsga <- function(x, ...) {
   z_label  <- if (x$inference == "analytical") "t" else "z"
   p_label  <- if (x$inference == "analytical") "P>|t|" else "P>|z|"
 
-  cat(sprintf("\nRD subgroup analysis  |  model: %s  |  bwidth: %g  |  kernel: %s\n\n",
-              x$model, x$bwidth, x$kernel))
+  if (identical(x$design, "did")) {
+    cat(sprintf("\nDiD subgroup analysis  |  unit: %s  |  time: %s  |  post = %s\n\n",
+                x$unit_name, x$time_name, as.character(x$post_value)))
+  } else {
+    cat(sprintf("\nRD subgroup analysis  |  model: %s  |  bwidth: %g  |  kernel: %s\n\n",
+                x$model, x$bwidth, x$kernel))
+  }
 
   hdr <- sprintf("%-12s | %9s  %9s  %6s  %7s  %s\n",
                  x$outcome, "Coef.", "Std. Err.", z_label, p_label, ci_label)
@@ -639,20 +859,22 @@ summary.wsga <- function(object, ...) {
   print(object, ...)
 
   if (!is.null(object$balance)) {
-    cat("\n--- Unweighted balance ---\n")
-    print(round(object$balance$unweighted$table, 4))
-    cat(sprintf("F = %.3f  (p = %.4f)  Mean |std diff| = %.4f\n",
-                object$balance$unweighted$Fstat,
-                object$balance$unweighted$pval_global,
-                object$balance$unweighted$avgdiff))
-
-    if (!is.null(object$balance$weighted)) {
-      cat("\n--- IPW-weighted balance ---\n")
-      print(round(object$balance$weighted$table, 4))
+    print_one_balance <- function(b, header) {
+      if (is.null(b)) return(invisible(NULL))
+      cat(sprintf("\n--- %s ---\n", header))
+      print(round(b$table, 4))
       cat(sprintf("F = %.3f  (p = %.4f)  Mean |std diff| = %.4f\n",
-                  object$balance$weighted$Fstat,
-                  object$balance$weighted$pval_global,
-                  object$balance$weighted$avgdiff))
+                  b$Fstat, b$pval_global, b$avgdiff))
+    }
+    print_one_balance(object$balance$unweighted$aggregate,
+                      "Unweighted balance (aggregate)")
+    print_one_balance(object$balance$weighted$aggregate,
+                      "IPW-weighted balance (aggregate)")
+    if (identical(object$design, "did")) {
+      print_one_balance(object$balance$unweighted$treated,
+                        "Unweighted balance (treated units only)")
+      print_one_balance(object$balance$weighted$treated,
+                        "IPW-weighted balance (treated units only)")
     }
   }
 

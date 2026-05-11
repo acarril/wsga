@@ -1,6 +1,6 @@
 Package: wsga
 Title: Weighted Subgroup Analysis
-Version: 0.6.0
+Version: 0.7.0
 Authors@R:
     person("Alvaro", "Carril", email = "alvarocarril@gmail.com", role = c("aut", "cre"))
 Description: Implements inverse probability weighted (IPW) subgroup analysis for
@@ -8,10 +8,10 @@ Description: Implements inverse probability weighted (IPW) subgroup analysis for
     propensity score model for subgroup membership, constructs IPW weights so
     that observed moderators are balanced across subgroups, and estimates
     per-subgroup treatment effects and their difference via weighted regression.
-    Currently supports sharp and fuzzy regression discontinuity designs; sharp
-    difference-in-differences support is planned. Includes three kernel types,
-    polynomial order selection, multiple weighting modes, common support
-    trimming, and bootstrap inference (standard, stratified, fixed first-stage).
+    Supports sharp and fuzzy regression discontinuity designs and sharp 2-period
+    difference-in-differences. Includes three kernel types, polynomial order
+    selection, multiple weighting modes, common support trimming, and bootstrap
+    inference (row-level, pairs cluster, stratified, fixed first-stage).
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

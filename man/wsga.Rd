@@ -2,14 +2,19 @@
 % Please edit documentation in R/wsga.R
 \name{wsga}
 \alias{wsga}
-\title{Weighted Subgroup Analysis in Regression Discontinuity Designs}
+\title{Weighted Subgroup Analysis}
 \usage{
 wsga(
   formula,
   data,
-  running,
+  design = c("rdd", "did"),
+  running = NULL,
   cutoff = 0,
-  bwidth,
+  bwidth = NULL,
+  unit = NULL,
+  time = NULL,
+  treat = NULL,
+  post_value = NULL,
   model = c("rf", "fs", "iv"),
   fuzzy = NULL,
   p = 1L,
@@ -39,15 +44,32 @@ wsga(
 included in the outcome regression; the right of \code{|} is the binary (0/1)
 subgroup indicator. If there are no covariates, write \code{outcome ~ 1 | subgroup}.}
 
-\item{data}{A data frame.}
+\item{data}{A data frame. For \code{design = "did"}, in long format (one row per
+unit-time).}
+
+\item{design}{Character: \code{"rdd"} (default) or \code{"did"}.}
 
 \item{running}{A one-sided formula (e.g. \code{~ score}) or a character string
-naming the running variable column in \code{data}.}
+naming the running variable column in \code{data}. Required when
+\code{design = "rdd"}.}
 
-\item{cutoff}{Numeric cutoff value. The running variable is internally
-centered: \code{x_c = running - cutoff}. Default \code{0}.}
+\item{cutoff}{Numeric cutoff value (\code{design = "rdd"}). The running variable
+is internally centered: \code{x_c = running - cutoff}. Default \code{0}.}
 
-\item{bwidth}{Positive numeric half-bandwidth. Required.}
+\item{bwidth}{Positive numeric half-bandwidth (\code{design = "rdd"}). Required.}
+
+\item{unit}{Character: name of the unit identifier column. Required when
+\code{design = "did"}.}
+
+\item{time}{Character: name of the time variable column. Required when
+\code{design = "did"}. Must have exactly 2 unique non-missing values.}
+
+\item{treat}{Character: name of the binary (0/1) treatment-group indicator
+(constant within unit). Required when \code{design = "did"}.}
+
+\item{post_value}{Optional value of \code{time} that denotes the post period.
+Default: \code{max(time)} for numeric/Date columns, or the second factor level
+otherwise.}
 
 \item{model}{Character: estimation model.
 \itemize{
@@ -180,11 +202,16 @@ set). \code{NULL} if \code{noipsw = TRUE}.}
 }
 }
 \description{
-Estimates per-subgroup RD treatment effects and their difference using
+Estimates per-subgroup treatment effects and their difference using
 inverse probability weighting (IPW) to balance observed moderators across
-subgroups at the cutoff. Supports sharp and fuzzy RD designs, multiple
-kernel types, polynomial order selection, three IPW weighting modes, common
-support trimming, and bootstrap inference.
+subgroups. Two designs are supported:
+\itemize{
+\item \strong{Regression discontinuity} (\code{design = "rdd"}, default): sharp and
+fuzzy RD, local polynomial regression with kernel weights.
+\item \strong{Difference-in-differences} (\code{design = "did"}): sharp 2-period DiD
+with long-form TWFE (unit + time fixed effects, fully interacted by
+subgroup).
+}
 }
 \examples{
 data(rddsga_synth)
