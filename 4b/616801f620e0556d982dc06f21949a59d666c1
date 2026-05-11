@@ -1,0 +1,38 @@
+tests/testthat/test-fixed-ps.R
+  ai_agent 1-68
+man/wsga.Rd
+  s_4cb00f9b578a6e::t_a863d14e96257c 122-132
+  s_4cb00f9b578a6e::t_cb1e0a1d54aafc 29
+DESCRIPTION
+  s_4cb00f9b578a6e::t_04add00402b051 3
+R/wsga.R
+  s_4cb00f9b578a6e::t_2806821acf2ef9 163
+  s_4cb00f9b578a6e::t_b76fce914ca865 407-410
+  s_4cb00f9b578a6e::t_8e4be4a3cbe808 621,624,626,628
+  s_4cb00f9b578a6e::t_4da085b2445476 72-81
+  s_4cb00f9b578a6e::t_0ffddfe1cbaf6a 511-515,528-538,540
+  s_4cb00f9b578a6e::t_66ecf8cc09b04e 497-498
+R/bootstrap.R
+  s_4cb00f9b578a6e::t_fa008b59e831c1 114
+  s_4cb00f9b578a6e::t_e45f4e280c563b 51-56,59-60,65-66,70
+  s_4cb00f9b578a6e::t_8ca31e61ca84cf 155,157
+  s_4cb00f9b578a6e::t_503e736960bdbf 147
+tests/testthat/test-cluster-bootstrap.R
+  s_4cb00f9b578a6e::t_0a275f1138f489 30,35-36,38-39,41-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.6",
+  "base_commit_sha": "4b616801f620e0556d982dc06f21949a59d666c1",
+  "prompts": {},
+  "sessions": {
+    "s_4cb00f9b578a6e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "25e699ac-6a44-4a2e-8c22-4a4c2456b65f",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
