@@ -1,0 +1,31 @@
+stata/wsga.sthlp
+  s_94dd97687f5fd4::t_f1daef9c3bd4b7 72,74
+  s_94dd97687f5fd4::t_b8539c478e0eff 221-229
+stata/tests/smoke_did.do
+  s_94dd97687f5fd4::t_d40fa6a461bebf 1-89
+stata/wsga.ado
+  s_94dd97687f5fd4::t_6c5878c791df7d 1,12
+  s_94dd97687f5fd4::t_9fbbf0c7ed594a 712
+  s_94dd97687f5fd4::t_9d465f8649269c 11,1191
+  s_94dd97687f5fd4::t_5bb8e4b8901a17 741
+  s_94dd97687f5fd4::t_8e5f2583d7a7fc 1390-1391
+  s_94dd97687f5fd4::t_b206954283c335 351
+  s_94dd97687f5fd4::t_8c5a170ad0c917 1380,1392-1400,1402
+  s_94dd97687f5fd4::t_01917f011b6e82 1192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.6",
+  "base_commit_sha": "bcb57f7db6d3b65d82db0e58a41e5d398bd0f922",
+  "prompts": {},
+  "sessions": {
+    "s_94dd97687f5fd4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aef1dc70-65e2-442a-9c58-6faafc5e3ad1",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
