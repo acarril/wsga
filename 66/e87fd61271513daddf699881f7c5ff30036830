@@ -1,0 +1,19 @@
+stata/wsga.ado
+  s_7ad00b5fca85e7::t_aa1deaec47b8b3 591-593
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.6",
+  "base_commit_sha": "66e87fd61271513daddf699881f7c5ff30036830",
+  "prompts": {},
+  "sessions": {
+    "s_7ad00b5fca85e7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "54820316-6950-47e0-b5c1-57425917cf4f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
