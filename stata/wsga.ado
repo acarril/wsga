@@ -1,4 +1,4 @@
-*! 1.3.0 Alvaro Carril 2026-05-11
+*! 1.3.1 Alvaro Carril 2026-05-11
 program define wsga, eclass
 version 11.1
 syntax varlist(min=1 numeric fv) [if] [in], ///
@@ -221,15 +221,15 @@ local kernel = "uni"
 
   if ("`kernel'"=="epanechnikov" | "`kernel'"=="epa") {
     local kernel_type = "Epanechnikov"
-    qui g double `kwt'=max(0,3/4*(`bwidthtab'^2-abs(`2')^2))*`oweights'
+    qui g double `kwt'=max(0,3/4*(`bwidthtab'^2-abs(`assignvar')^2))*`oweights'
   }
   else if ("`kernel'"=="triangular" | "`kernel'"=="tri") {
       local kernel_type = "Triangular"
-      qui g double `kwt'=max(0,`bwidthtab'-abs(`2'))*`oweights'
+      qui g double `kwt'=max(0,`bwidthtab'-abs(`assignvar'))*`oweights'
   }
   else {
     local kernel_type = "Uniform"
-    qui g double `kwt'=(-`bwidthtab'<=(`2') & `2'<`bwidthtab')*`oweights'
+    qui g double `kwt'=(-`bwidthtab'<=(`assignvar') & `assignvar'<`bwidthtab')*`oweights'
   }
        
 
