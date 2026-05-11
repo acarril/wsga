@@ -1,0 +1,38 @@
+DESCRIPTION
+  s_4cb00f9b578a6e::t_604a32c3a7e090 3
+vignettes/wsga-intro.Rmd
+  s_4cb00f9b578a6e::t_abf4b43249ffc0 133
+man/wsga.Rd
+  s_4cb00f9b578a6e::t_76815d9703bba5 25-26
+  s_4cb00f9b578a6e::t_e264868c861c96 135-141,143-146
+  s_4cb00f9b578a6e::t_cea694de48d1d4 93-94,96-109
+tests/testthat/test-inference.R
+  s_4cb00f9b578a6e::t_93a07f7d4e3ec8 1-78
+R/wsga.R
+  s_4cb00f9b578a6e::t_e343b5a15d030d 392,399-404,406-423
+  s_4cb00f9b578a6e::t_df4097d037963a 82-88,90-93
+  s_4cb00f9b578a6e::t_8f10c3a66b6743 139-140
+  s_4cb00f9b578a6e::t_b633a39f23e14d 163-173
+  s_4cb00f9b578a6e::t_6c6caf63e56043 537-542
+  s_4cb00f9b578a6e::t_5145ff86b813b7 459-460
+  s_4cb00f9b578a6e::t_1e74c0caf987d2 51-63
+  s_4cb00f9b578a6e::t_98ba9f30f82ea6 548
+R/bootstrap.R
+  s_4cb00f9b578a6e::t_d44bf9de156bd8 93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.5",
+  "base_commit_sha": "40128238211b467ffc835a993d8b094965cab201",
+  "prompts": {},
+  "sessions": {
+    "s_4cb00f9b578a6e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "25e699ac-6a44-4a2e-8c22-4a4c2456b65f",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
