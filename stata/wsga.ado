@@ -1,12 +1,46 @@
-*! 1.2.0 Alvaro Carril 2026-05-09
+*! 1.3.0 Alvaro Carril 2026-05-11
 program define wsga, eclass
 version 11.1
-syntax varlist(min=2 numeric fv) [if] [in], ///
-  SGroup(name) BWidth(real) [ fuzzy(name) Cutoff(real 0) Kernel(string) /// important inputs
+syntax varlist(min=1 numeric fv) [if] [in], ///
+  SGroup(name) [ DESign(string) /// design switch: rdd (default) or did
+    BWidth(real -1) fuzzy(name) Cutoff(real 0) Kernel(string) /// RDD-specific
+    UNIt(varname) TIMe(varname) TReat(varname) POST_value(string) /// DiD-specific
   	IPSWeight(name) PSCore(name) comsup /// newvars
     BALance(varlist numeric) DIBALance probit /// balancepscore opts
     IVregress REDUCEDform FIRSTstage vce(string) p(int 1) m(int 2) rbalance(int 0) /// model opts
     noBOOTstrap bsreps(real 50) FIXEDbootstrap BLOCKbootstrap(string) NORMal noipsw weights(string) ] // bootstrap options
+
+// ─── Design dispatch ──────────────────────────────────────────────────────────
+if "`design'" == "" local design "rdd"
+if "`design'" != "rdd" & "`design'" != "did" {
+  di as error "design() must be either 'rdd' or 'did' (got `design')."
+  exit 198
+}
+if "`design'" == "did" {
+  // Validate DiD-required options
+  if "`unit'" == "" | "`time'" == "" | "`treat'" == "" {
+    di as error "design(did) requires options unit(), time(), and treat()."
+    exit 198
+  }
+  if "`ivregress'" != "" | "`firststage'" != "" {
+    di as error ///
+"Fuzzy DiD is not currently supported. The paper's DiD identification (Carril et al., {it:Subgroup effect identification in DiD designs}) covers sharp DiD only. If you have imperfect compliance with treatment in a panel setting, consider this design out of scope."
+    exit 198
+  }
+  _wsga_did `0'
+  exit
+}
+// design == "rdd" from here: require bwidth and at least 2 variables in varlist
+if `bwidth' < 0 {
+  di as error "bwidth() is required (positive) when design(rdd) (default)."
+  exit 198
+}
+local n_varlist : word count `varlist'
+if `n_varlist' < 2 {
+  di as error "design(rdd) requires both an outcome variable and an assignment variable in the varlist."
+  exit 198
+}
+// ──────────────────────────────────────────────────────────────────────────────
 
 *-------------------------------------------------------------------------------
 * Check inputs
@@ -1133,9 +1167,196 @@ ereturn scalar `matname'_N_G0 = `N_G0'
 end
 
 ********************************************************************************
+* _wsga_did: sharp 2-period DiD pipeline
+*   Receives the original wsga arglist (called via `_wsga_did `0'`).  Parses its
+*   own syntax (mostly mirroring wsga's, with DiD-required options).  Currently
+*   implements: input validation, design-matrix construction, analytical
+*   cluster-robust estimation via xtreg, fe.  IPW, balance tables, and the
+*   pairs cluster bootstrap are added in follow-up patches; the corresponding
+*   options are accepted but produce a warning if requested.
+********************************************************************************
+
+program define _wsga_did, eclass
+version 11.1
+syntax varlist(min=1 numeric fv) [if] [in], ///
+  SGroup(name) UNIt(varname) TIMe(varname) TReat(varname) ///
+  [ DESign(string) POST_value(string) ///
+    BALance(varlist numeric) DIBALance probit ///
+    IPSWeight(name) PSCore(name) comsup ///
+    vce(string) m(int 2) rbalance(int 0) ///
+    noBOOTstrap bsreps(real 200) FIXEDbootstrap BLOCKbootstrap(string) ///
+    NORMal noipsw weights(string) ///
+    /* RDD-only options that are silently accepted and ignored: */ ///
+    BWidth(real -1) Cutoff(real 0) Kernel(string) ///
+    fuzzy(name) IVregress REDUCEDform FIRSTstage p(int 1) ]
+
+  // ── Sample mask
+  marksample touse, novarlist
+  markout `touse' `unit' `time' `treat' `sgroup'
+
+  // ── Outcome and covariates
+  local depvar : word 1 of `varlist'
+  local covariates : list varlist - depvar
+
+  // ── Validate: time has exactly 2 unique non-missing values
+  qui levelsof `time' if `touse', local(t_vals)
+  local n_tvals : word count `t_vals'
+  if `n_tvals' != 2 {
+    di as error ///
+"design(did) requires `time' to have exactly 2 unique non-missing values; found `n_tvals'. Staggered adoption is not currently supported."
+    exit 198
+  }
+
+  // ── Resolve post_value
+  if "`post_value'" == "" {
+    qui summarize `time' if `touse', meanonly
+    local post_value = r(max)
+  }
+  else {
+    local pv_ok = 0
+    foreach tv of local t_vals {
+      if "`tv'" == "`post_value'" local pv_ok = 1
+    }
+    if `pv_ok' == 0 {
+      di as error ///
+"post_value(`post_value') is not one of the unique values of `time' (`t_vals')."
+      exit 198
+    }
+  }
+
+  // ── Unit-constancy checks (treat, sgroup, balance moderators)
+  foreach v in `treat' `sgroup' `balance' {
+    tempvar _dist
+    qui by `unit' (`v'), sort: gen byte `_dist' = (`v'[1] != `v'[_N])
+    qui summarize `_dist' if `touse', meanonly
+    if r(max) > 0 {
+      di as error ///
+"`v' varies within `unit' (the DiD design requires `v' to be unit-level)."
+      exit 198
+    }
+    drop `_dist'
+  }
+
+  // ── Build design variables
+  tempvar G0 G1 post G0_Z G1_Z G0_post G1_post
+  qui gen byte `G0'      = (`sgroup' == 0)
+  qui gen byte `G1'      = (`sgroup' == 1)
+  qui gen byte `post'    = (`time' == `post_value')
+  qui gen byte `G0_Z'    = `G0' * `treat' * `post'    // delta_0
+  qui gen byte `G1_Z'    = `G1' * `treat' * `post'    // delta_1
+  qui gen byte `G0_post' = `G0' * `post'
+  qui gen byte `G1_post' = `G1' * `post'
+
+  // ── Covariate × G interactions
+  local g0_covs ""
+  local g1_covs ""
+  foreach v of local covariates {
+    tempvar g0_`v' g1_`v'
+    qui gen double `g0_`v'' = `G0' * `v'
+    qui gen double `g1_`v'' = `G1' * `v'
+    local g0_covs "`g0_covs' `g0_`v''"
+    local g1_covs "`g1_covs' `g1_`v''"
+  }
+
+  // ── Warnings for not-yet-supported features (will be added in follow-up PRs)
+  if "`ipsw'" != "noipsw" & `: list sizeof balance' > 0 {
+    di as text ///
+"Note: IPW reweighting in DiD mode is not yet implemented in this Stata build. Falling back to unweighted DiD-SGA (equivalent to specifying {bf:noipsw})."
+  }
+  if "`bootstrap'" != "nobootstrap" {
+    di as text ///
+"Note: bootstrap inference in DiD mode is not yet implemented in this Stata build. Analytical cluster-robust SEs are reported instead."
+  }
+
+  // ── Estimate: long-form TWFE with unit FE absorbed via xtreg, fe
+  qui xtset `unit'
+  local rhs `G0_Z' `G1_Z' `G0_post' `G1_post' `g0_covs' `g1_covs'
+  xtreg `depvar' `rhs' if `touse', fe vce(cluster `unit')
+
+  // ── Extract coefficients of interest
+  scalar b_g0   = _b[`G0_Z']
+  scalar b_g1   = _b[`G1_Z']
+  scalar b_diff = b_g1 - b_g0
+  scalar se_g0  = _se[`G0_Z']
+  scalar se_g1  = _se[`G1_Z']
+  // SE of the difference via the post-estimation vcov
+  matrix V = e(V)
+  local idx_g0 = colnumb(V, "`G0_Z'")
+  local idx_g1 = colnumb(V, "`G1_Z'")
+  scalar cov_01  = V[`idx_g0', `idx_g1']
+  scalar se_diff = sqrt(se_g0^2 + se_g1^2 - 2*cov_01)
+
+  scalar t_g0   = b_g0   / se_g0
+  scalar t_g1   = b_g1   / se_g1
+  scalar t_diff = b_diff / se_diff
+
+  // df for analytical inference: from xtreg's degrees of freedom
+  scalar df = e(df_r)
+  scalar p_g0   = 2*ttail(df, abs(t_g0))
+  scalar p_g1   = 2*ttail(df, abs(t_g1))
+  scalar p_diff = 2*ttail(df, abs(t_diff))
+  scalar ci_lb_g0   = b_g0   + invttail(df, 0.975)*se_g0
+  scalar ci_ub_g0   = b_g0   + invttail(df, 0.025)*se_g0
+  scalar ci_lb_g1   = b_g1   + invttail(df, 0.975)*se_g1
+  scalar ci_ub_g1   = b_g1   + invttail(df, 0.025)*se_g1
+  scalar ci_lb_diff = b_diff + invttail(df, 0.975)*se_diff
+  scalar ci_ub_diff = b_diff + invttail(df, 0.025)*se_diff
+
+  // ── Display
+  di
+  di as text "DiD subgroup analysis  |  unit: " as result "`unit'" ///
+     as text "  |  time: " as result "`time'" ///
+     as text "  |  post = " as result "`post_value'"
+  di
+  di as text "{hline 13}{c TT}{hline 64}"
+  di as text %12s abbrev("`depvar'",12) " {c |}" ///
+    _col(15) "{ralign 11:Coef.}" ///
+    _col(26) "{ralign 12:Std. Err.}" ///
+    _col(38) "{ralign 8:t }" ///
+    _col(46) "{ralign 8:P>|t|}" ///
+    _col(54) "{ralign 25:[95% Conf. Interval]}"
+  di as text "{hline 13}{c +}{hline 64}"
+  di as text "Subgroup" _col(14) "{c |}"
+  forvalues g = 0/1 {
+    display as text %12s abbrev("`g'",12) " {c |}" ///
+      as result ///
+      "  " %9.0g b_g`g' ///
+      "  " %9.0g se_g`g' ///
+      "    " %5.2f t_g`g' ///
+      "   " %5.3f p_g`g' ///
+      "    " %9.0g ci_lb_g`g' ///
+      "   " %9.0g ci_ub_g`g'
+  }
+  di as text "{hline 13}{c +}{hline 64}"
+  display as text "Difference   {c |}" ///
+    as result ///
+    "  " %9.0g b_diff ///
+    "  " %9.0g se_diff ///
+    "    " %5.2f t_diff ///
+    "   " %5.3f p_diff ///
+    "    " %9.0g ci_lb_diff ///
+    "   " %9.0g ci_ub_diff
+  di as text "{hline 13}{c BT}{hline 64}"
+
+  qui count if `touse' & `sgroup' == 0
+  scalar N_G0 = r(N)
+  qui count if `touse' & `sgroup' == 1
+  scalar N_G1 = r(N)
+  di as text "N (G=0): " as result %4.0f N_G0 ///
+     as text "   N (G=1): " as result %4.0f N_G1
+end
+
+********************************************************************************
 
 /*
 CHANGE LOG
+1.3
+  - Add design(did) path: sharp 2-period DiD-SGA via xtreg, fe with
+    cluster-robust SEs (TWFE design matrix: subgroup-interacted unit FE
+    is absorbed; G0_Z = G0*D*post and G1_Z = G1*D*post are the
+    coefficients of interest).  IPW, balance tables, and the pairs
+    cluster bootstrap will follow in subsequent patches; the
+    corresponding options are accepted but trigger a one-line note.
 1.2
   - Rename command: rddsga -> wsga (Weighted Subgroup Analysis)
   - rddsga retained as deprecated alias (separate .ado / .sthlp)
