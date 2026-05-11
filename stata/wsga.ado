@@ -1,44 +1,42 @@
-*! 1.4.0 Alvaro Carril 2026-05-11
-program define wsga, eclass
+*! 1.5.0 Alvaro Carril 2026-05-11
+
+// ── Dispatcher ────────────────────────────────────────────────────────────────
+program define wsga
+  version 11.1
+  gettoken sub rest : 0, parse(" ")
+  local sub = strlower("`sub'")
+  if "`sub'" == "rdd" {
+    _wsga_rdd `rest'
+  }
+  else if "`sub'" == "did" {
+    _wsga_did `rest'
+  }
+  else {
+    di as error `"wsga: unknown subcommand "`sub'". Valid subcommands: rdd, did."'
+    di as text "Type {help wsga} for details."
+    exit 198
+  }
+end
+
+// ── RDD implementation ────────────────────────────────────────────────────────
+program define _wsga_rdd, eclass
 version 11.1
 syntax varlist(min=1 numeric fv) [if] [in], ///
-  SGroup(name) [ DESign(string) /// design switch: rdd (default) or did
-    BWidth(real -1) fuzzy(name) Cutoff(real 0) Kernel(string) /// RDD-specific
-    UNIt(varname) TIMe(varname) TReat(varname) POST_value(string) /// DiD-specific
-  	IPSWeight(name) PSCore(name) comsup /// newvars
-    BALance(varlist numeric) DIBALance probit /// balancepscore opts
-    IVregress REDUCEDform FIRSTstage vce(string) p(int 1) m(int 2) rbalance(int 0) /// model opts
-    noBOOTstrap bsreps(real 50) FIXEDbootstrap FIXEDps BLOCKbootstrap(string) NORMal noipsw weights(string) ///
-    Seed(string) ] // bootstrap options
+  SGroup(name) RUnning(varname) ///
+  [ BWidth(real -1) Cutoff(real 0) Kernel(string) fuzzy(name) ///
+    IPSWeight(name) PSCore(name) comsup ///
+    BALance(varlist numeric) DIBALance probit ///
+    IVregress REDUCEDform FIRSTstage vce(string) p(int 1) m(int 2) rbalance(int 0) ///
+    noBOOTstrap bsreps(real 200) FIXEDbootstrap FIXEDps BLOCKbootstrap(string) NORMal noipsw weights(string) ///
+    Seed(string) ]
 
-// ─── Design dispatch ──────────────────────────────────────────────────────────
-if "`design'" == "" local design "rdd"
-if "`design'" != "rdd" & "`design'" != "did" {
-  di as error "design() must be either 'rdd' or 'did' (got `design')."
-  exit 198
-}
-if "`design'" == "did" {
-  // Validate DiD-required options
-  if "`unit'" == "" | "`time'" == "" | "`treat'" == "" {
-    di as error "design(did) requires options unit(), time(), and treat()."
-    exit 198
-  }
-  if "`ivregress'" != "" | "`firststage'" != "" {
-    di as error ///
-"Fuzzy DiD is not currently supported. The paper's DiD identification (Carril et al., {it:Subgroup effect identification in DiD designs}) covers sharp DiD only. If you have imperfect compliance with treatment in a panel setting, consider this design out of scope."
-    exit 198
-  }
-  _wsga_did `0'
-  exit
-}
-// design == "rdd" from here: require bwidth and at least 2 variables in varlist
+// ─── Validate required options ────────────────────────────────────────────────
 if `bwidth' < 0 {
-  di as error "bwidth() is required (positive) when design(rdd) (default)."
+  di as error "bwidth() is required and must be positive."
   exit 198
 }
-local n_varlist : word count `varlist'
-if `n_varlist' < 2 {
-  di as error "design(rdd) requires both an outcome variable and an assignment variable in the varlist."
+if ("`ivregress'" != "" | "`firststage'" != "") & "`fuzzy'" == "" {
+  di as error "fuzzy() must be specified with ivregress or firststage."
   exit 198
 }
 // ──────────────────────────────────────────────────────────────────────────────
@@ -47,19 +45,11 @@ if `n_varlist' < 2 {
 * Check inputs
 *-------------------------------------------------------------------------------
 
-// Check that depvar and assignvar are not factor variables
-local fvops = "`s(fvops)'" == "true" | _caller() >= 11 
-if `fvops' { 
-  local vv: di "version " ///me
-  string(max(11,_caller())) ", missing: " 
+// Check that depvar is not a factor variable
+local fvops = "`s(fvops)'" == "true" | _caller() >= 11
+if `fvops' {
   gettoken first rest : varlist
-  gettoken second rest : rest
   _fv_check_depvar `first'
-  capture _fv_check_depvar `second'
-  if _rc!=0 {
-    di as error "assignvar {bf:`second'} may not be a factor variable"
-    exit 198
-  }
 }
 
 
@@ -132,12 +122,11 @@ marksample touse, novarlist
 // Extract outcome variable
 local depvar : word 1 of `varlist'
 
-// Extract assignment variable
-local assignvar :	word 2 of `varlist'
+// Running variable (from named option)
+local assignvar `running'
 
 // Define covariates list
 local covariates : list varlist - depvar
-local covariates : list covariates - assignvar
 
 // Add c. stub to continuous covariates in balance for factor interactions
 foreach var in `balance' {
@@ -265,7 +254,7 @@ scalar unw_N_G0 = `N_G0'
 if `: list sizeof balance'!=0 {
 
 // Compute balanace matrix 
-balancematrix, matname(unw)  ///
+_wsga_rdd_balancematrix, matname(unw)  ///
  weights(`oweights') assignvar(`assignvar') touse(`touse') bwidth(`bwidth') balance(`balance') m(`m') ///
   sgroup(`sgroup') sgroup0(`sgroup0') n_balance(`n_balance') rbalance(`rbalance')
   
@@ -294,7 +283,7 @@ if "`ipsw'" != "noipsw" {
 *-------------------------------------------------------------------------------
 // Compute balanace matrix 
 
-balancematrix, matname(ipsw)  ///
+_wsga_rdd_balancematrix, matname(ipsw)  ///
   psw ipsweight(`ipsweight') weights(`oweights') touse(`touse') assignvar(`assignvar') bwidth(`bwidth') balance(`balance') m(`m') ///
   pscore(`pscore') comsup nocomsup(`NOCOMSUP') binarymodel(`binarymodel') ///
 	sgroup(`sgroup') sgroup0(`sgroup0') n_balance(`n_balance')  rbalance(`rbalance') 
@@ -367,9 +356,9 @@ ereturn local blockbootstrap `blockbootstrap'
 }
     
   // Compute bootstrapped variance-covariance matrix and post results
-  if "`bootstrap'" != "nobootstrap" myboo `sgroup' _cutoff `bsreps', `psw_boot_opts'
+  if "`bootstrap'" != "nobootstrap" _wsga_rdd_myboo `sgroup' _cutoff `bsreps', `psw_boot_opts'
   // If no bootstrap, trim b and V to show only RD estimates
-  else epost `sgroup' _cutoff 
+  else _wsga_rdd_epost `sgroup' _cutoff 
 }
 
 * Reduced form
@@ -402,9 +391,9 @@ ereturn local blockbootstrap `blockbootstrap'
 }
 
   // Compute bootstrapped variance-covariance matrix and post results
-  if "`bootstrap'" != "nobootstrap" myboo `sgroup' _cutoff `bsreps', `psw_boot_opts'
+  if "`bootstrap'" != "nobootstrap" _wsga_rdd_myboo `sgroup' _cutoff `bsreps', `psw_boot_opts'
   // If no bootstrap, trim b and V to show only RD estimates
-  else epost `sgroup' _cutoff 
+  else _wsga_rdd_epost `sgroup' _cutoff 
 }
 
 * Instrumental variables
@@ -455,10 +444,10 @@ ereturn local cmdline `RFline'
     }
 
   // Compute bootstrapped variance-covariance matrix and post results
-  if "`bootstrap'" != "nobootstrap" myboo `sgroup' `fuzzy' `bsreps', `psw_boot_opts'
+  if "`bootstrap'" != "nobootstrap" _wsga_rdd_myboo `sgroup' `fuzzy' `bsreps', `psw_boot_opts'
 
   // If no bootstrap, trim b and V to show only RD estimates
-  else epost `sgroup' `fuzzy'
+  else _wsga_rdd_epost `sgroup' `fuzzy'
 *  mat cumulative = e(cumulative)
 *  ereturn matrix cumulative = cumulative
 
@@ -671,7 +660,7 @@ end
 *-------------------------------------------------------------------------------
 * epost: post matrices in e(b) and e(V); leave other ereturn results unchanged
 *-------------------------------------------------------------------------------
-program epost, eclass
+program _wsga_rdd_epost, eclass
   // Store results: scalars
   local scalars: e(scalars)
   foreach scalar of local scalars {
@@ -706,7 +695,7 @@ end
 *-------------------------------------------------------------------------------
 * myboo: compute bootstrapped variance-covariance matrix & adjust ereturn results
 *-------------------------------------------------------------------------------
-program define myboo, eclass
+program define _wsga_rdd_myboo, eclass
   syntax anything [, PSW IPSWeight(name) KERNELipsw(name) KWT(name) ///
     TOuse(name) BWIDTH(string) BALance(varlist) OWeights(name) ///
     M(integer 2) BINarymodel(string) PSCore(name) COmsup Seed(string)]
@@ -888,7 +877,7 @@ end
 *-------------------------------------------------------------------------------
 * nlcompost: modify b matrix after nlcom
 *-------------------------------------------------------------------------------
-program nlcompost, eclass
+program _wsga_rdd_nlcompost, eclass
   matrix b = e(b)
   matrix colnames b = Difference 
   ereturn repost b = b, rename // renames V matrix as well
@@ -897,7 +886,7 @@ end
 *-------------------------------------------------------------------------------
 * nlcomhack: hack b and V matrices to inlude nlcom results
 *-------------------------------------------------------------------------------
-program nlcomhack, eclass
+program _wsga_rdd_nlcomhack, eclass
   tempname b V nlcom_V
   matrix `b' = e(b)
   matrix `V' = e(V)
@@ -911,9 +900,9 @@ end
 
 
 *-------------------------------------------------------------------------------
-* balancematrix: compute balance table matrices and other statistics
+* _wsga_rdd_balancematrix: compute balance table matrices and other statistics
 *-------------------------------------------------------------------------------
-program define balancematrix, eclass
+program define _wsga_rdd_balancematrix, eclass
 syntax, matname(string) /// important inputs, differ by call
   touse(name)  weights(string) bwidth(string) balance(varlist) m(int) /// unchanging inputs
   [psw ipsweight(name)  pscore(name) comsup nocomsup(name) binarymodel(string)] /// only needed for PSW balance
@@ -1184,15 +1173,12 @@ program define _wsga_did, eclass
 version 11.1
 syntax varlist(min=1 numeric fv) [if] [in], ///
   SGroup(name) UNIt(varname) TIMe(varname) TReat(varname) ///
-  [ DESign(string) POST_value(string) ///
+  [ POST_value(string) ///
     BALance(varlist numeric) DIBALance probit ///
     IPSWeight(name) PSCore(name) comsup ///
-    vce(string) m(int 2) rbalance(int 0) ///
+    vce(string) m(int 2) ///
     noBOOTstrap bsreps(real 200) FIXEDbootstrap FIXEDps BLOCKbootstrap(string) ///
-    NORMal noipsw weights(string) Seed(string) ///
-    /* RDD-only options that are silently accepted and ignored: */ ///
-    BWidth(real -1) Cutoff(real 0) Kernel(string) ///
-    fuzzy(name) IVregress REDUCEDform FIRSTstage p(int 1) ]
+    NORMal noipsw weights(string) Seed(string) ]
 
   // ── Sample mask
   marksample touse, novarlist
@@ -1643,8 +1629,8 @@ CHANGE LOG
 0.3
   - Standardize syntax to merge with original rddsga.ado
 0.2
-  - Implement balancematrix as separate subroutine
-  - Standardize balancematrix output
+  - Implement _wsga_rdd_balancematrix as separate subroutine
+  - Standardize _wsga_rdd_balancematrix output
 0.1
 	- First working version, independent of project
 	- Remove any LaTeX output
@@ -1654,7 +1640,7 @@ KNOWN ISSUES/BUGS:
   - Should we use pweights or iweights? iw don't work with ivregress.
 
 TODOS AND IDEAS:
-  - Create subroutine of matlist formatting for display of balancematrix output
+  - Create subroutine of matlist formatting for display of _wsga_rdd_balancematrix output
   - Implement matrix manipulation in Mata
   - Get rid of sgroup0 hack
   - Allow that groupvar is not necessarily an indicator variable
