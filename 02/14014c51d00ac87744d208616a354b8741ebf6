@@ -1,0 +1,47 @@
+DESCRIPTION
+  s_172e96fd954646::t_b3491d13c0142d 3
+stata/rddsga.ado
+  s_172e96fd954646::t_64708b6535ff07 1
+stata/wsga.ado
+  s_172e96fd954646::t_d37fd1a8115e8f 1369
+  s_172e96fd954646::t_b9e4b032ff5909 1297
+  s_172e96fd954646::t_a5257baf1cdc74 1231-1233
+  s_172e96fd954646::t_40143d3ed36025 1356-1361
+  s_172e96fd954646::t_5cf04eea730c05 1294
+  s_172e96fd954646::t_227ef071ae487b 1
+  s_172e96fd954646::t_123868575c1371 1379-1390,1392,1394,1400-1401,1404,1408
+  s_172e96fd954646::t_c2e7c1ba8bbdeb 1636-1642
+  s_172e96fd954646::t_da72840a4df3ca 1560
+  s_172e96fd954646::t_7034ec3f4cf524 1161-1166
+  s_172e96fd954646::t_1c737d3a096eca 1243,1249-1262,1264,1271,1273-1274,1277-1278,1281-1282,1288-1289
+  s_172e96fd954646::t_bf6aedb347c0e3 1193-1194
+stata/rddsga.sthlp
+  s_172e96fd954646::t_6e1cc665119c67 2
+stata/wsga_rdd.sthlp
+  s_172e96fd954646::t_5188efc56e5a72 2
+stata/wsga_did.sthlp
+  s_172e96fd954646::t_f3ddd95c3d6216 2
+  s_172e96fd954646::t_0450ca46fffbb8 36-37
+  s_172e96fd954646::t_a623a0916ae117 35
+  s_172e96fd954646::t_4d6a1ed3f70ee7 45
+stata/wsga.sthlp
+  s_172e96fd954646::t_6b09bb0731c186 2
+NEWS.md
+  s_172e96fd954646::t_00dc1bd729301c 3-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.6",
+  "base_commit_sha": "0214014c51d00ac87744d208616a354b8741ebf6",
+  "prompts": {},
+  "sessions": {
+    "s_172e96fd954646": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0b5ee357-e47d-4e7f-896f-e9da65edc0fe",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
