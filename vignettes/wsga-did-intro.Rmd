@@ -45,10 +45,9 @@ correction is applied — coefficients reflect both the subgroup effect and
 the contribution of imbalanced moderators.
 
 ```{r noipsw}
-fit_unw <- wsga(
+fit_unw <- wsga_did(
   y ~ 1 | sgroup,
   data       = wsga_did_synth,
-  design     = "did",
   unit       = "unit",
   time       = "time",
   treat      = "D",
@@ -68,10 +67,9 @@ balance tables (printed by `summary()`) show the imbalance before and after
 weighting.
 
 ```{r ipsw}
-fit_ipsw <- wsga(
+fit_ipsw <- wsga_did(
   y ~ m | sgroup,
   data       = wsga_did_synth,
-  design     = "did",
   unit       = "unit",
   time       = "time",
   treat      = "D",
@@ -87,14 +85,13 @@ treatment effect is identified off the treated cells.
 
 ### Step 3: Cluster bootstrap inference
 
-When `design = "did"`, `cluster_var` defaults to the `unit` variable, so the
-bootstrap is a pairs-cluster bootstrap over units (Cameron–Gelbach–Miller).
+`wsga_did()` defaults `cluster_var` to `unit`, so the bootstrap is a
+pairs-cluster bootstrap over panel units (Cameron–Gelbach–Miller).
 
 ```{r bootstrap, cache = TRUE}
-fit_boot <- wsga(
+fit_boot <- wsga_did(
   y ~ m | sgroup,
   data       = wsga_did_synth,
-  design     = "did",
   unit       = "unit",
   time       = "time",
   treat      = "D",
@@ -112,7 +109,6 @@ clusters were resampled.
 
 | Argument      | Description |
 |---|---|
-| `design`      | Must be `"did"` to use the difference-in-differences path. |
 | `unit`        | Column name of the unit identifier (panel ID). |
 | `time`        | Column name of the time variable; must have exactly 2 unique values. |
 | `treat`       | Column name of the binary treatment indicator (constant within unit). |

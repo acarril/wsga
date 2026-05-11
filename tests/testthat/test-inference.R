@@ -1,7 +1,7 @@
 data(rddsga_synth)
 
 test_that("default inference is 'empirical' when bootstrap = TRUE", {
-  fit <- wsga(y ~ 1 | sgroup, data = rddsga_synth,
+  fit <- wsga_rdd(y ~ 1 | sgroup, data = rddsga_synth,
               running = ~ x, bwidth = 0.5,
               noipsw = TRUE, bootstrap = TRUE, bsreps = 20, seed = 1)
   expect_equal(fit$inference, "empirical")
@@ -13,7 +13,7 @@ test_that("default inference is 'empirical' when bootstrap = TRUE", {
 })
 
 test_that("default inference is 'analytical' when bootstrap = FALSE", {
-  fit <- wsga(y ~ 1 | sgroup, data = rddsga_synth,
+  fit <- wsga_rdd(y ~ 1 | sgroup, data = rddsga_synth,
               running = ~ x, bwidth = 0.5,
               noipsw = TRUE, bootstrap = FALSE)
   expect_equal(fit$inference, "analytical")
@@ -21,7 +21,7 @@ test_that("default inference is 'analytical' when bootstrap = FALSE", {
 })
 
 test_that("inference = 'normal' yields symmetric CIs from the bootstrap SE", {
-  fit <- wsga(y ~ 1 | sgroup, data = rddsga_synth,
+  fit <- wsga_rdd(y ~ 1 | sgroup, data = rddsga_synth,
               running = ~ x, bwidth = 0.5,
               noipsw = TRUE, bootstrap = TRUE, bsreps = 50, seed = 7,
               inference = "normal")
@@ -34,11 +34,11 @@ test_that("inference = 'normal' yields symmetric CIs from the bootstrap SE", {
 })
 
 test_that("inference = 'normal' and 'empirical' differ on the same bootstrap", {
-  fit_emp  <- wsga(y ~ 1 | sgroup, data = rddsga_synth,
+  fit_emp  <- wsga_rdd(y ~ 1 | sgroup, data = rddsga_synth,
                    running = ~ x, bwidth = 0.5,
                    noipsw = TRUE, bootstrap = TRUE, bsreps = 100, seed = 42,
                    inference = "empirical")
-  fit_norm <- wsga(y ~ 1 | sgroup, data = rddsga_synth,
+  fit_norm <- wsga_rdd(y ~ 1 | sgroup, data = rddsga_synth,
                    running = ~ x, bwidth = 0.5,
                    noipsw = TRUE, bootstrap = TRUE, bsreps = 100, seed = 42,
                    inference = "normal")
@@ -50,27 +50,27 @@ test_that("inference = 'normal' and 'empirical' differ on the same bootstrap", {
 
 test_that("invalid combinations error", {
   expect_error(
-    wsga(y ~ 1 | sgroup, data = rddsga_synth,
-         running = ~ x, bwidth = 0.5,
-         bootstrap = TRUE, inference = "analytical"),
+    wsga_rdd(y ~ 1 | sgroup, data = rddsga_synth,
+             running = ~ x, bwidth = 0.5,
+             bootstrap = TRUE, inference = "analytical"),
     "requires `bootstrap = FALSE`"
   )
   expect_error(
-    wsga(y ~ 1 | sgroup, data = rddsga_synth,
-         running = ~ x, bwidth = 0.5,
-         bootstrap = FALSE, inference = "empirical"),
+    wsga_rdd(y ~ 1 | sgroup, data = rddsga_synth,
+             running = ~ x, bwidth = 0.5,
+             bootstrap = FALSE, inference = "empirical"),
     "requires `bootstrap = TRUE`"
   )
   expect_error(
-    wsga(y ~ 1 | sgroup, data = rddsga_synth,
-         running = ~ x, bwidth = 0.5,
-         bootstrap = FALSE, inference = "normal"),
+    wsga_rdd(y ~ 1 | sgroup, data = rddsga_synth,
+             running = ~ x, bwidth = 0.5,
+             bootstrap = FALSE, inference = "normal"),
     "requires `bootstrap = TRUE`"
   )
 })
 
 test_that("bootstrap result exposes failed count", {
-  fit <- wsga(y ~ 1 | sgroup, data = rddsga_synth,
+  fit <- wsga_rdd(y ~ 1 | sgroup, data = rddsga_synth,
               running = ~ x, bwidth = 0.5,
               noipsw = TRUE, bootstrap = TRUE, bsreps = 30, seed = 3)
   expect_true("failed" %in% names(fit$bootstrap))
