@@ -1,0 +1,121 @@
+---
+title: "Introduction to wsga: difference-in-differences"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to wsga (DiD)}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+## Overview
+
+`wsga` implements weighted subgroup analysis (the "Weighted Subgroup Analysis"
+framework) for designs that need control variables for identification. This
+vignette covers the sharp 2-period difference-in-differences (DiD) path. The
+goal is to recover per-subgroup treatment effects when subgroups differ in
+observed moderators: a raw comparison conflates the causal effect of the
+subgroup with the effect of correlated moderators, and inverse probability
+weighting (IPW) on subgroup membership corrects for that imbalance.
+
+## Loading the data
+
+We use the bundled `wsga_did_synth` dataset: a balanced two-period panel of
+500 units (1,000 rows). The binary subgroup `sgroup`, the moderator `m`, and
+the treatment indicator `D` are all constant within unit. `D` is independent of
+`sgroup`, but `m` has a higher mean in `sgroup = 1` — exactly the imbalance
+that IPW is designed to address. True per-subgroup effects are
+`tau_0 = 1`, `tau_1 = 3` (true difference = 2).
+
+```{r load}
+library(wsga)
+data(wsga_did_synth)
+str(wsga_did_synth)
+table(wsga_did_synth$sgroup, wsga_did_synth$time)
+```
+
+### Step 1: Unweighted DiD subgroup analysis
+
+The unweighted estimator fits a long-form TWFE regression (unit and time
+fixed effects) interacted with subgroup. With `noipsw = TRUE`, no IPW
+correction is applied — coefficients reflect both the subgroup effect and
+the contribution of imbalanced moderators.
+
+```{r noipsw}
+fit_unw <- wsga(
+  y ~ 1 | sgroup,
+  data       = wsga_did_synth,
+  design     = "did",
+  unit       = "unit",
+  time       = "time",
+  treat      = "D",
+  noipsw     = TRUE,
+  bootstrap  = FALSE
+)
+print(fit_unw)
+```
+
+Point estimates should be close to (`1`, `3`) with a difference near `2`.
+
+### Step 2: IPW-weighted DiD subgroup analysis
+
+Adding `m` on the left of `|` makes it a covariate in the outcome regression
+**and** a balance variable for the propensity score model on `sgroup`. The
+balance tables (printed by `summary()`) show the imbalance before and after
+weighting.
+
+```{r ipsw}
+fit_ipsw <- wsga(
+  y ~ m | sgroup,
+  data       = wsga_did_synth,
+  design     = "did",
+  unit       = "unit",
+  time       = "time",
+  treat      = "D",
+  bootstrap  = FALSE
+)
+summary(fit_ipsw)
+```
+
+The unweighted aggregate balance shows a large standardized difference in `m`
+across subgroups; IPW reduces it to near zero. For DiD, the package also
+reports a treated-only balance table (units with `D = 1`), since the
+treatment effect is identified off the treated cells.
+
+### Step 3: Cluster bootstrap inference
+
+When `design = "did"`, `cluster_var` defaults to the `unit` variable, so the
+bootstrap is a pairs-cluster bootstrap over units (Cameron–Gelbach–Miller).
+
+```{r bootstrap, cache = TRUE}
+fit_boot <- wsga(
+  y ~ m | sgroup,
+  data       = wsga_did_synth,
+  design     = "did",
+  unit       = "unit",
+  time       = "time",
+  treat      = "D",
+  bsreps     = 100,
+  seed       = 1
+)
+print(fit_boot)
+```
+
+The reported standard errors and CIs come from the empirical bootstrap
+distribution; the message at the bottom of the print confirms how many
+clusters were resampled.
+
+## Key options (DiD)
+
+| Argument      | Description |
+|---|---|
+| `design`      | Must be `"did"` to use the difference-in-differences path. |
+| `unit`        | Column name of the unit identifier (panel ID). |
+| `time`        | Column name of the time variable; must have exactly 2 unique values. |
+| `treat`       | Column name of the binary treatment indicator (constant within unit). |
+| `post_value`  | Value of `time` denoting the post period. Defaults to `max(time)`. |
+| `cluster_var` | Column defining clusters for the bootstrap and analytical SE. Defaults to `unit` for DiD. |
+| `inference`   | `"empirical"` (default with bootstrap), `"normal"`, or `"analytical"` (cluster-robust sandwich when `cluster_var` is set). |
