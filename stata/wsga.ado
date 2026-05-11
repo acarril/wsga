@@ -1,4 +1,4 @@
-*! 1.5.0 Alvaro Carril 2026-05-11
+*! 1.0.1 Alvaro Carril 2026-05-11
 
 // ── Dispatcher ────────────────────────────────────────────────────────────────
 program define wsga
@@ -1287,6 +1287,8 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   qui xtset `unit'
   local rhs `G0_Z' `G1_Z' `G0_post' `G1_post' `g0_covs' `g1_covs'
   xtreg `depvar' `rhs' [pw=`ipw_var'] if `touse' & `ipw_var' > 0, fe vce(cluster `unit')
+  tempvar _did_esample
+  gen byte `_did_esample' = e(sample)
 
   // ── Extract coefficients of interest
   scalar b_g0   = _b[`G0_Z']
@@ -1415,6 +1417,10 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     scalar se_g1   = r(sd)
     qui summarize _drawdiff
     scalar se_diff = r(sd)
+    qui correlate _draw1 _draw2, covariance
+    matrix _wsga_cov = r(C)
+    scalar cov_01 = _wsga_cov[1,2]
+    matrix drop _wsga_cov
     scalar t_g0   = b_g0   / se_g0
     scalar t_g1   = b_g1   / se_g1
     scalar t_diff = b_diff / se_diff
@@ -1560,12 +1566,55 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
       }
     }
   }
+
+  // ── Post clean e(b)/e(V) trimmed to the two treatment-effect columns.
+  // Analytic case: cov_01 comes from xtreg's VCV.
+  // Bootstrap case: cov_01 is overwritten above with the bootstrap covariance.
+  matrix _b_did = (b_g0, b_g1)
+  matrix colnames _b_did = G0_Z G1_Z
+  matrix _V_did = (se_g0^2, cov_01 \ cov_01, se_g1^2)
+  matrix rownames _V_did = G0_Z G1_Z
+  matrix colnames _V_did = G0_Z G1_Z
+  ereturn post _b_did _V_did, esample(`_did_esample')
+  ereturn local cmd    "wsga"
+  ereturn local subcmd "did"
+  ereturn local depvar "`depvar'"
+  ereturn scalar b_g0       = b_g0
+  ereturn scalar b_g1       = b_g1
+  ereturn scalar b_diff     = b_diff
+  ereturn scalar se_g0      = se_g0
+  ereturn scalar se_g1      = se_g1
+  ereturn scalar se_diff    = se_diff
+  ereturn scalar t_g0       = t_g0
+  ereturn scalar t_g1       = t_g1
+  ereturn scalar t_diff     = t_diff
+  ereturn scalar p_g0       = p_g0
+  ereturn scalar p_g1       = p_g1
+  ereturn scalar p_diff     = p_diff
+  ereturn scalar ci_lb_g0   = ci_lb_g0
+  ereturn scalar ci_ub_g0   = ci_ub_g0
+  ereturn scalar ci_lb_g1   = ci_lb_g1
+  ereturn scalar ci_ub_g1   = ci_ub_g1
+  ereturn scalar ci_lb_diff = ci_lb_diff
+  ereturn scalar ci_ub_diff = ci_ub_diff
+  ereturn scalar N_G0       = N_G0
+  ereturn scalar N_G1       = N_G1
+  ereturn scalar df         = df
+  if use_bootstrap {
+    ereturn scalar B_ok    = B_ok
+    ereturn scalar N_clust = N_clust
+  }
 end
 
 ********************************************************************************
 
 /*
 CHANGE LOG
+1.0.1
+  - bug(Stata/did): add ereturn post at end of _wsga_did to trim e(b)/e(V) to
+    G0_Z and G1_Z columns; bootstrap path now also computes covariance of the
+    two draws so V is fully bootstrap-derived when bootstrap is on
+  - chore: align Stata *! version with unified 1.0.x versioning
 1.3
   - Add design(did) path: sharp 2-period DiD-SGA via xtreg, fe with
     cluster-robust SEs (TWFE design matrix: subgroup-interacted unit FE
