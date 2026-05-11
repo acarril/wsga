@@ -1,0 +1,27 @@
+NEWS.md
+  s_0b1584b02571f7::t_a6d1b4789d86b0 3-16
+stata/wsga.ado
+  s_0b1584b02571f7::t_a2917307e4e864 1
+  s_0b1584b02571f7::t_34e7358626b8bc 1290-1291
+  s_0b1584b02571f7::t_10adf38ac87e5e 1569-1606
+  s_0b1584b02571f7::t_79489060611df9 1613-1617
+  s_0b1584b02571f7::t_53e90acefb850b 1420-1423
+DESCRIPTION
+  s_0b1584b02571f7::t_81f32fc707bb06 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.6",
+  "base_commit_sha": "f4d26f81f854e7bf4d95c89b7df077f64cf62478",
+  "prompts": {},
+  "sessions": {
+    "s_0b1584b02571f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a3299ef9-c4bb-4fc2-946d-d2e118b6054e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
