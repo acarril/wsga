@@ -210,25 +210,25 @@ run_bootstrap <- function(run_one_rep, data, B, est,
 #' Wild cluster bootstrap (unrestricted, Rademacher signs)
 #'
 #' WCB-U for weighted least squares. The propensity score and IPW weights are
-#' fixed at their original-sample values — WCB conditions on the data and only
+#' fixed at their original-sample values -- WCB conditions on the data and only
 #' sign-flips residuals at the cluster level, so it does **not** propagate
 #' uncertainty from the propensity-score estimation step. Use pairs bootstrap
 #' if propagating IPW uncertainty matters more than small-G size control.
 #'
 #' Per replicate `b`:
-#'   1. Draw cluster signs `v_g ∈ {−1, +1}` (Rademacher), one per cluster.
-#'   2. Form `y*_i = ŷ_i + v_{g(i)} · e_i`, where `ŷ` and `e` are the
+#'   1. Draw cluster signs `v_g in {-1, +1}` (Rademacher), one per cluster.
+#'   2. Form `y*_i = yhat_i + v_{g(i)} * e_i`, where `yhat` and `e` are the
 #'      original-sample fitted values and raw residuals.
 #'   3. Refit the weighted OLS on `(X, y*)` with the original weights.
 #'   4. Record the two subgroup coefficients.
 #'
 #' The fit uses a cached QR decomposition (X is fixed across replicates), so
-#' each replicate is O(np), not O(np²).
+#' each replicate is O(np), not O(np^2).
 #'
 #' @param fit The original `lm` fit returned by `run_model()`.
-#' @param X Full design matrix (n × p) from `build_*_design_matrix()`.
+#' @param X Full design matrix (n x p) from `build_*_design_matrix()`.
 #' @param y Outcome vector (length n).
-#' @param w Weights vector (length n; kernel × IPW).
+#' @param w Weights vector (length n; kernel * IPW).
 #' @param active Logical mask: rows with `final_wt > 0` used in estimation.
 #' @param cluster_vec Cluster identifier (length n; any type).
 #' @param coef_g0_name,coef_g1_name Column names for the two coefficients of
@@ -260,7 +260,7 @@ run_wild_bootstrap <- function(fit, X, y, w, active, cluster_vec,
   missing_coefs <- setdiff(c(coef_g0_name, coef_g1_name), non_aliased)
   if (length(missing_coefs) > 0) {
     stop(sprintf(
-      "Wild cluster bootstrap: coefficient(s) %s aliased away by `lm()` — likely perfect collinearity between the subgroup and treatment indicators on the active sample.",
+      "Wild cluster bootstrap: coefficient(s) %s aliased away by `lm()` -- likely perfect collinearity between the subgroup and treatment indicators on the active sample.",
       paste(shQuote(missing_coefs), collapse = ", ")))
   }
 
@@ -283,7 +283,7 @@ run_wild_bootstrap <- function(fit, X, y, w, active, cluster_vec,
   }
   cluster_idx <- match(as.character(c_a), as.character(unique_clusters))
 
-  # Cache QR of the weighted design — refits are then a single qr.coef() call.
+  # Cache QR of the weighted design -- refits are then a single qr.coef() call.
   sqrt_w <- sqrt(w_a)
   X_w    <- sqrt_w * X_clean
   qr_X   <- qr(X_w)
