@@ -1,4 +1,4 @@
-*! 1.0.2 Alvaro Carril 2026-05-11
+*! 1.1.0 Alvaro Carril 2026-05-11
 
 // ── Dispatcher ────────────────────────────────────────────────────────────────
 program define wsga
