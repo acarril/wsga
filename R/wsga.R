@@ -49,6 +49,13 @@ NULL
 #' @param bootstrap Logical. Run the bootstrap loop (refits the full pipeline
 #'   per replicate)? Default `TRUE`.
 #' @param bsreps Positive integer: number of bootstrap replications. Default `200`.
+#' @param boot_type Character. Bootstrap resampling scheme: `"pairs"` (default)
+#'   or `"wild"`. `"wild"` runs an unrestricted wild cluster bootstrap with
+#'   Rademacher signs and is recommended when the number of clusters is small
+#'   (G < ~30); requires `cluster_var` to be set and is not supported with
+#'   `model = "iv"`. WCB conditions on the data and does not re-estimate the
+#'   propensity score, so it trades some IPW-uncertainty coverage for better
+#'   size control under H₀.
 #' @param inference Character. How standard errors, CIs, and p-values are
 #'   computed and reported. One of:
 #'   - `"empirical"`: bootstrap SE; empirical (percentile) CIs at 2.5/97.5;
@@ -63,7 +70,8 @@ NULL
 #'   resampling. Default `NULL` (unstratified). Semantics adapt to
 #'   `cluster_var`: when `cluster_var` is `NULL`, `block_var` defines strata
 #'   of rows; when `cluster_var` is set, it defines strata of clusters and
-#'   must be constant within each cluster (validated at runtime).
+#'   must be constant within each cluster (validated at runtime). Ignored
+#'   when `boot_type = "wild"`.
 #' @param fixed_fs Logical. Fixed first-stage bootstrap for IV: bootstrap the
 #'   reduced form and divide by the point-estimate first-stage coefficients.
 #'   Default `FALSE`.
@@ -157,6 +165,7 @@ wsga_rdd <- function(formula,
                      rbalance     = 0L,
                      bootstrap    = TRUE,
                      bsreps       = 200L,
+                     boot_type    = c("pairs", "wild"),
                      inference    = NULL,
                      block_var    = NULL,
                      fixed_fs     = FALSE,
@@ -166,6 +175,7 @@ wsga_rdd <- function(formula,
                      cluster_var  = NULL,
                      weights      = NULL) {
   cl <- match.call()
+  boot_type <- match.arg(boot_type)
   out <- .wsga_impl(
     formula      = formula,
     data         = data,
@@ -186,6 +196,7 @@ wsga_rdd <- function(formula,
     rbalance     = rbalance,
     bootstrap    = bootstrap,
     bsreps       = bsreps,
+    boot_type    = boot_type,
     inference    = inference,
     block_var    = block_var,
     fixed_fs     = fixed_fs,
@@ -236,10 +247,15 @@ wsga_rdd <- function(formula,
 #'   Default `FALSE`.
 #' @param bootstrap Logical. Run the bootstrap loop? Default `TRUE`.
 #' @param bsreps Positive integer: number of bootstrap replications. Default `200`.
+#' @param boot_type Character. Bootstrap resampling scheme: `"pairs"` (default)
+#'   or `"wild"` (unrestricted wild cluster bootstrap with Rademacher signs).
+#'   `"wild"` is recommended when the number of clusters is small (G < ~30).
+#'   See [wsga_rdd()] for the IPW-uncertainty caveat.
 #' @param inference Character. One of `"empirical"` (default with bootstrap),
 #'   `"normal"`, or `"analytical"` (default without bootstrap).
 #' @param block_var Character or `NULL`. Column name for stratified bootstrap
 #'   resampling (strata of clusters when `cluster_var` is set). Default `NULL`.
+#'   Ignored when `boot_type = "wild"`.
 #' @param fixed_ps Logical. Diagnostic flag; see [wsga_rdd()] for details.
 #'   Default `FALSE`.
 #' @param seed Integer or `NULL`. RNG seed for reproducibility. Default `NULL`.
@@ -283,6 +299,7 @@ wsga_did <- function(formula,
                      show_balance = FALSE,
                      bootstrap    = TRUE,
                      bsreps       = 200L,
+                     boot_type    = c("pairs", "wild"),
                      inference    = NULL,
                      block_var    = NULL,
                      fixed_ps     = FALSE,
@@ -291,6 +308,7 @@ wsga_did <- function(formula,
                      cluster_var  = NULL,
                      weights      = NULL) {
   cl <- match.call()
+  boot_type <- match.arg(boot_type)
   out <- .wsga_impl(
     formula      = formula,
     data         = data,
@@ -307,6 +325,7 @@ wsga_did <- function(formula,
     show_balance = show_balance,
     bootstrap    = bootstrap,
     bsreps       = bsreps,
+    boot_type    = boot_type,
     inference    = inference,
     block_var    = block_var,
     fixed_ps     = fixed_ps,
@@ -343,6 +362,7 @@ wsga_did <- function(formula,
                    rbalance    = 0L,
                    bootstrap   = TRUE,
                    bsreps      = 200L,
+                   boot_type   = c("pairs", "wild"),
                    inference   = NULL,
                    block_var   = NULL,
                    fixed_fs    = FALSE,
@@ -353,10 +373,11 @@ wsga_did <- function(formula,
                    weights     = NULL) {
 
   # ── 1. Argument validation ──────────────────────────────────────────────────
-  design   <- match.arg(design)
-  model    <- match.arg(model)
-  kernel   <- match.arg(kernel)
-  ps_model <- match.arg(ps_model)
+  design    <- match.arg(design)
+  model     <- match.arg(model)
+  kernel    <- match.arg(kernel)
+  ps_model  <- match.arg(ps_model)
+  boot_type <- match.arg(boot_type)
   if (!m %in% c(0L, 1L, 2L))
     stop("`m` must be 0, 1, or 2.")
   if (!is.data.frame(data))
@@ -433,6 +454,19 @@ wsga_did <- function(formula,
   # Cluster variable.  In DiD, default to `unit` when not specified (Q2).
   if (design == "did" && is.null(cluster_var)) cluster_var <- unit_name
   clust <- if (!is.null(cluster_var)) data[[cluster_var]] else NULL
+
+  # Wild bootstrap validation: requires bootstrap + cluster_var + non-IV model.
+  # WCB conditions on the data and only sign-flips residuals at the cluster
+  # level, so a cluster identifier is essential and the implementation is
+  # restricted to lm-based estimators (no 2SLS yet).
+  if (identical(boot_type, "wild")) {
+    if (!bootstrap)
+      stop("`boot_type = \"wild\"` requires `bootstrap = TRUE` (the wild bootstrap is itself the bootstrap loop).")
+    if (is.null(cluster_var))
+      stop("`boot_type = \"wild\"` requires a clustering variable; set `cluster_var` (in DiD this defaults to `unit`).")
+    if (model == "iv")
+      stop("`boot_type = \"wild\"` is not supported with `model = \"iv\"` (fuzzy RDD). Use `boot_type = \"pairs\"` or set `model` to `\"rf\"` / `\"fs\"`.")
+  }
 
   # For DiD with a cluster variable in play, the analytical SE should be
   # cluster-robust.  If the user left `vce` at its package default ("HC1")
@@ -661,55 +695,71 @@ wsga_did <- function(formula,
   if (bootstrap) {
     point_est <- c(est$b_g0, est$b_g1)
 
-    # Closure capturing all configuration for one bootstrap replicate
-    run_one_rep <- make_boot_rep(
-      design           = design,
-      outcome_name     = outcome_for_model,
-      running_name     = running_name,
-      cutoff           = cutoff,
-      bwidth           = bwidth,
-      unit_name        = unit_name,
-      time_name        = time_name,
-      treat_name       = treat_name,
-      post_value       = post_value,
-      G_name           = sgroup_name,
-      covariate_names  = covariate_names,
-      balance_names    = balance_names,
-      obs_wt_name      = if (!is.null(weights) && is.character(weights)) weights else NULL,
-      obs_weights_vec  = obs_weights,
-      kernel           = kernel,
-      noipsw           = noipsw,
-      ps_model         = ps_model,
-      comsup           = comsup,
-      m                = m,
-      model            = model,
-      fuzzy_name       = fuzzy_name,
-      p                = p,
-      vce              = vce,
-      cluster_var_name = cluster_var,
-      fixed_fs         = fixed_fs,
-      fs_coefs         = fs_coefs,
-      fixed_ps            = fixed_ps,
-      original_pscore     = pscore,
-      original_comsup_idx = comsup_idx
-    )
-
-    # Few-clusters advisory when clustering is active
-    if (!is.null(cluster_var)) {
+    # Few-clusters advisory when clustering is active (under pairs only;
+    # WCB is the recommended fix for this regime).
+    if (!is.null(cluster_var) && boot_type == "pairs") {
       n_clust <- length(unique(data[[cluster_var]][!is.na(data[[cluster_var]])]))
       if (n_clust < 30L) {
         warning(sprintf(
-          "Cluster bootstrap with %d clusters. With fewer than ~30 clusters, pairs-cluster bootstrap can substantially understate standard errors. Consider also reporting analytical cluster-robust SEs (set `bootstrap = FALSE`, `vce = \"cluster\"`) and/or a wild cluster bootstrap-t (not implemented; see fwildclusterboot::boottest in R or boottest in Stata).",
+          "Pairs-cluster bootstrap with %d clusters. With fewer than ~30 clusters, pairs over-rejects under H0; consider `boot_type = \"wild\"` for better size control (Cameron, Gelbach & Miller 2008).",
           n_clust
         ))
       }
     }
 
-    boot_result <- run_bootstrap(run_one_rep, data, bsreps, point_est,
-                                 cluster_var = cluster_var,
-                                 block_var   = block_var,
-                                 unit_var    = if (design == "did") unit_name else NULL,
-                                 seed        = seed)
+    if (boot_type == "wild") {
+      boot_result <- run_wild_bootstrap(
+        fit           = model_result$fit,
+        X             = dm$X,
+        y             = dm$y,
+        w             = final_wt,
+        active        = active,
+        cluster_vec   = clust,
+        coef_g0_name  = model_result$coef_g0_name,
+        coef_g1_name  = model_result$coef_g1_name,
+        B             = bsreps,
+        seed          = seed
+      )
+    } else {
+      # Closure capturing all configuration for one bootstrap replicate
+      run_one_rep <- make_boot_rep(
+        design           = design,
+        outcome_name     = outcome_for_model,
+        running_name     = running_name,
+        cutoff           = cutoff,
+        bwidth           = bwidth,
+        unit_name        = unit_name,
+        time_name        = time_name,
+        treat_name       = treat_name,
+        post_value       = post_value,
+        G_name           = sgroup_name,
+        covariate_names  = covariate_names,
+        balance_names    = balance_names,
+        obs_wt_name      = if (!is.null(weights) && is.character(weights)) weights else NULL,
+        obs_weights_vec  = obs_weights,
+        kernel           = kernel,
+        noipsw           = noipsw,
+        ps_model         = ps_model,
+        comsup           = comsup,
+        m                = m,
+        model            = model,
+        fuzzy_name       = fuzzy_name,
+        p                = p,
+        vce              = vce,
+        cluster_var_name = cluster_var,
+        fixed_fs         = fixed_fs,
+        fs_coefs         = fs_coefs,
+        fixed_ps            = fixed_ps,
+        original_pscore     = pscore,
+        original_comsup_idx = comsup_idx
+      )
+
+      boot_result <- run_bootstrap(run_one_rep, data, bsreps, point_est,
+                                   cluster_var = cluster_var,
+                                   block_var   = block_var,
+                                   unit_var    = if (design == "did") unit_name else NULL,
+                                   seed        = seed)
+    }
 
     # SE and t-statistics always come from the bootstrap when it runs.
     V_boot  <- boot_result$vcov
@@ -781,6 +831,7 @@ wsga_did <- function(formula,
       model         = model,
       noipsw        = noipsw,
       inference     = inference,
+      boot_type     = if (bootstrap) boot_type else NULL,
       cluster_var_name = if (is.null(cluster_var)) NULL else cluster_var,
       fixed_ps      = fixed_ps,
       unit_name     = unit_name,
@@ -1000,9 +1051,12 @@ print.wsga <- function(x, ...) {
 
   if (use_boot) {
     ps_tag <- if (isTRUE(x$fixed_ps)) " [PS fixed]" else ""
+    boot_label <- if (identical(x$boot_type, "wild")) "Wild cluster bootstrap"
+                  else "Cluster bootstrap"
     if (!is.null(x$bootstrap$N_clusters)) {
       total_reps <- x$bootstrap$B_ok + x$bootstrap$failed
-      cat(sprintf("Cluster bootstrap: %d/%d reps, clustered on '%s' (%d clusters)%s\n",
+      cat(sprintf("%s: %d/%d reps, clustered on '%s' (%d clusters)%s\n",
+                  boot_label,
                   x$bootstrap$B_ok, total_reps,
                   x$cluster_var_name, x$bootstrap$N_clusters, ps_tag))
     } else {

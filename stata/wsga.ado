@@ -1148,11 +1148,23 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     IPSWeight(name) PSCore(name) comsup ///
     vce(string) m(int 2) ///
     noBOOTstrap bsreps(real 200) FIXEDbootstrap FIXEDps BLOCKbootstrap(string) ///
+    WILDcluster ///
     NORMal noipsw weights(string) Seed(string) ]
 
   // ── Sample mask
   marksample touse, novarlist
   markout `touse' `unit' `time' `treat' `sgroup'
+
+  // ── wildcluster validation: requires the bootstrap loop (it IS the loop).
+  if "`wildcluster'" != "" & "`bootstrap'" == "nobootstrap" {
+    di as error ///
+"option {bf:wildcluster} requires the bootstrap loop; cannot be combined with {bf:nobootstrap}."
+    exit 198
+  }
+  if "`wildcluster'" != "" & "`blockbootstrap'" != "" {
+    di as text ///
+"Note: {bf:blockbootstrap} is ignored under {bf:wildcluster} (Rademacher signs are drawn unstratified)."
+  }
 
   // ── Outcome and covariates
   local depvar : word 1 of `varlist'
@@ -1327,32 +1339,70 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   scalar ci_lb_diff = b_diff + invttail(df, 0.975)*se_diff
   scalar ci_ub_diff = b_diff + invttail(df, 0.025)*se_diff
 
-  // ── Cluster bootstrap (refit PS per rep; Q1 + Q3 + Q4).
-  // Whole units are resampled with replacement; fresh unit IDs are assigned
-  // by bsample's idcluster() option so unit FE remain identified across
-  // duplicate draws (the Cameron-Gelbach-Miller recipe).  The analytical
-  // SE/CI/p scalars set above are overridden with bootstrap-based values.
+  // ── Cluster bootstrap.
+  // Two paths:
+  //   - Pairs (default): whole units are resampled with replacement; fresh
+  //     unit IDs are assigned via bsample's idcluster() so unit FE remain
+  //     identified across duplicate draws (Cameron-Gelbach-Miller recipe).
+  //     Refits the propensity score per replicate.
+  //   - Wild (`wildcluster` option): WCB-U with Rademacher signs at the
+  //     cluster level.  Conditions on the data (no PS refit) and sign-flips
+  //     the residuals from the main fit, then refits xtreg on y_star.  This
+  //     is the small-G recommendation (CGM 2008); it does not propagate IPW
+  //     uncertainty (R: see wsga::run_wild_bootstrap).
+  // The analytical SE/CI/p scalars set above are overridden with
+  // bootstrap-based values below.
   scalar B_ok    = 0
   scalar N_clust = .
   scalar use_bootstrap = ("`bootstrap'" != "nobootstrap")
   if use_bootstrap {
     qui levelsof `unit' if `touse', local(_clusters)
     scalar N_clust = `: word count `_clusters''
-    if N_clust < 30 {
+    if N_clust < 30 & "`wildcluster'" == "" {
       di as text ///
-"Note: cluster bootstrap with " as result %4.0f N_clust as text " clusters.  Pairs-cluster bootstrap can substantially understate SEs at < ~30 clusters.  Consider supplementing with a wild cluster bootstrap-t (Stata: boottest)."
+"Note: pairs-cluster bootstrap with " as result %4.0f N_clust as text " clusters.  With fewer than ~30 clusters, pairs over-rejects under H0; consider the {bf:wildcluster} option for better size control (Cameron, Gelbach & Miller 2008)."
     }
+
+    if "`wildcluster'" != "" {
+      // Store fitted values (X*beta + unit FE) and idiosyncratic residuals
+      // BEFORE saving the tempfile so they survive the per-rep reload.
+      tempvar _wsga_yhat _wsga_e_hat
+      qui predict double `_wsga_yhat'  if `_did_esample', xbu
+      qui predict double `_wsga_e_hat' if `_did_esample', e
+    }
+
     tempfile _wsga_did_panel
     qui save `_wsga_did_panel'
 
     tempname _wsga_did_draws
     matrix `_wsga_did_draws' = J(`bsreps', 2, .)
 
-    display as text "Cluster bootstrap (`bsreps' reps):"
+    if "`wildcluster'" != "" {
+      display as text "Wild cluster bootstrap (`bsreps' reps):"
+    }
+    else {
+      display as text "Cluster bootstrap (`bsreps' reps):"
+    }
     if "`seed'" != "" set seed `seed'
     forvalues _b = 1/`bsreps' {
       qui use `_wsga_did_panel', clear
       capture {
+        if "`wildcluster'" != "" {
+          // ─── WCB-U: Rademacher signs, one per unit, broadcast to all rows.
+          tempvar _wsga_u _wsga_sign _wsga_ystar
+          qui by `unit', sort: gen double `_wsga_u' = runiform() if _n == 1
+          qui by `unit': replace `_wsga_u' = `_wsga_u'[1]
+          qui gen double `_wsga_sign' = cond(`_wsga_u' < 0.5, -1, 1)
+          qui gen double `_wsga_ystar' = `_wsga_yhat' + `_wsga_sign' * `_wsga_e_hat'
+
+          // Refit on bootstrap outcome; weights and X fixed at original values.
+          qui xtreg `_wsga_ystar' `rhs' [pw=`ipsweight'] ///
+            if `_did_esample' & `ipsweight' > 0, fe vce(cluster `unit')
+          matrix `_wsga_did_draws'[`_b', 1] = _b[`G0_Z']
+          matrix `_wsga_did_draws'[`_b', 2] = _b[`G1_Z']
+          scalar B_ok = B_ok + 1
+        }
+        else {
         if "`blockbootstrap'" != "" {
           qui bsample, cluster(`unit') idcluster(_wsga_new_unit) strata(`blockbootstrap')
         }
@@ -1417,7 +1467,8 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
         matrix `_wsga_did_draws'[`_b', 1] = _b[`G0_Z']
         matrix `_wsga_did_draws'[`_b', 2] = _b[`G1_Z']
         scalar B_ok = B_ok + 1
-      }
+        }   // end else (pairs branch)
+      }     // end capture
       if mod(`_b', 10) == 0 | `_b' == `bsreps' di "  " %4.0f `_b' "/`bsreps'"
     }
     qui use `_wsga_did_panel', clear
@@ -1528,7 +1579,8 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   di as text "N (G=0): " as result %4.0f N_G0 ///
      as text "   N (G=1): " as result %4.0f N_G1
   if use_bootstrap {
-    di as text "Cluster bootstrap: " as result %4.0f B_ok ///
+    local _boot_label = cond("`wildcluster'" != "", "Wild cluster bootstrap", "Cluster bootstrap")
+    di as text "`_boot_label': " as result %4.0f B_ok ///
        as text " / " as result `bsreps' ///
        as text " reps, clustered on '" as result "`unit'" ///
        as text "' (" as result %4.0f N_clust as text " clusters)"
@@ -1626,6 +1678,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   if use_bootstrap {
     ereturn scalar B_ok    = B_ok
     ereturn scalar N_clust = N_clust
+    ereturn local boot_type = cond("`wildcluster'" != "", "wild", "pairs")
   }
 end
 

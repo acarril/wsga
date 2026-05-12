@@ -19,6 +19,7 @@ wsga_did(
   show_balance = FALSE,
   bootstrap = TRUE,
   bsreps = 200L,
+  boot_type = c("pairs", "wild"),
   inference = NULL,
   block_var = NULL,
   fixed_ps = FALSE,
@@ -73,11 +74,17 @@ Default \code{FALSE}.}
 
 \item{bsreps}{Positive integer: number of bootstrap replications. Default \code{200}.}
 
+\item{boot_type}{Character. Bootstrap resampling scheme: \code{"pairs"} (default)
+or \code{"wild"} (unrestricted wild cluster bootstrap with Rademacher signs).
+\code{"wild"} is recommended when the number of clusters is small (G < ~30).
+See \code{\link[=wsga_rdd]{wsga_rdd()}} for the IPW-uncertainty caveat.}
+
 \item{inference}{Character. One of \code{"empirical"} (default with bootstrap),
 \code{"normal"}, or \code{"analytical"} (default without bootstrap).}
 
 \item{block_var}{Character or \code{NULL}. Column name for stratified bootstrap
-resampling (strata of clusters when \code{cluster_var} is set). Default \code{NULL}.}
+resampling (strata of clusters when \code{cluster_var} is set). Default \code{NULL}.
+Ignored when \code{boot_type = "wild"}.}
 
 \item{fixed_ps}{Logical. Diagnostic flag; see \code{\link[=wsga_rdd]{wsga_rdd()}} for details.
 Default \code{FALSE}.}
