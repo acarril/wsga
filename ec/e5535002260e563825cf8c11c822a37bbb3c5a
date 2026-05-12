@@ -1,0 +1,23 @@
+.Rbuildignore
+  s_80a134d04d3a76::t_dbc78ae4ccb1b6 5
+R/bootstrap.R
+  s_80a134d04d3a76::t_655dff92fed4fa 263
+  s_80a134d04d3a76::t_a0ca418926789a 286
+  s_80a134d04d3a76::t_0677c498bd14cf 213,219-220,226,229,231
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.6",
+  "base_commit_sha": "ece5535002260e563825cf8c11c822a37bbb3c5a",
+  "prompts": {},
+  "sessions": {
+    "s_80a134d04d3a76": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "366154d7-000f-40c5-a26c-1940b51fffc4",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
