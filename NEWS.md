@@ -1,6 +1,6 @@
 # wsga (R package) NEWS
 
-## wsga 1.1.0 (2026-05-11)
+## wsga 1.0.3 (2026-05-12)
 
 ### New features
 

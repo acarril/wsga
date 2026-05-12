@@ -1,4 +1,4 @@
-v 1.1.0
+v 1.0.3
 d Alvaro Carril
 p wsga Weighted subgroup analysis (RD designs; sharp DiD planned)
 p rddsga (deprecated alias of wsga; installs the same files)
