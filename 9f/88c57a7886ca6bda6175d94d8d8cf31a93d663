@@ -1,0 +1,19 @@
+README.md
+  s_80a134d04d3a76::t_05c30d7e8054a0 24,31,34,52,70,83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.6",
+  "base_commit_sha": "9f88c57a7886ca6bda6175d94d8d8cf31a93d663",
+  "prompts": {},
+  "sessions": {
+    "s_80a134d04d3a76": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "366154d7-000f-40c5-a26c-1940b51fffc4",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
