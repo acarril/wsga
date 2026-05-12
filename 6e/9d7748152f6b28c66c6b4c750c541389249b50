@@ -1,0 +1,53 @@
+stata/tests/smoke_did_wild.do
+  s_80a134d04d3a76::t_93caf3fe6b649d 1-107
+R/wsga.R
+  s_80a134d04d3a76::t_40eab460fc6369 365
+  s_80a134d04d3a76::t_196575b3759f52 458-470
+  s_80a134d04d3a76::t_ff6df652ebd9e6 250-253,258
+  s_80a134d04d3a76::t_8f879a81b55d5d 52-58,73-74
+  s_80a134d04d3a76::t_8cd52d7828af3f 698-700,704,710-762
+  s_80a134d04d3a76::t_1e6917a3558104 834
+  s_80a134d04d3a76::t_49cd5ef82f4fa4 168,178,199
+  s_80a134d04d3a76::t_8fdc81c00620c1 1054-1055,1058-1059
+  s_80a134d04d3a76::t_bd0615c6282436 302,311,328
+  s_80a134d04d3a76::t_370637cb79a716 376-380
+stata/wsga.ado
+  s_80a134d04d3a76::t_f265a8fe4a7af6 1151,1158-1167
+  s_80a134d04d3a76::t_ebc8d0e5962fcc 1405
+  s_80a134d04d3a76::t_20d13db0aa6b4c 1582-1583
+  s_80a134d04d3a76::t_196a8817f4fba3 1470-1471
+  s_80a134d04d3a76::t_6f10f8e1c840b6 1681
+  s_80a134d04d3a76::t_4a44469daa99dd 1342-1354,1361,1363-1371,1373,1380-1385,1390-1404
+man/wsga_rdd.Rd
+  s_80a134d04d3a76::t_18ff6f91762f10 26,100-107,125-126
+stata/wsga_did.sthlp
+  s_80a134d04d3a76::t_74e32fbf17dcde 46
+  s_80a134d04d3a76::t_dd9f36f3484aba 139
+  s_80a134d04d3a76::t_ac13c1c7676b43 74,77-100
+R/bootstrap.R
+  s_80a134d04d3a76::t_c4c23f9eb50789 208-257,267-271,278-338
+  s_80a134d04d3a76::t_78d546755f5366 258-266,272-277
+tests/testthat/test-wild-bootstrap.R
+  s_80a134d04d3a76::t_ddabe3b6ff0d05 126-158
+  s_80a134d04d3a76::t_de125b9f8cf6bb 1-125
+DESCRIPTION
+  s_80a134d04d3a76::t_7218e506f7e1be 14-15
+man/wsga_did.Rd
+  s_80a134d04d3a76::t_18ff6f91762f10 22,77-81,86-87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.6",
+  "base_commit_sha": "6e9d7748152f6b28c66c6b4c750c541389249b50",
+  "prompts": {},
+  "sessions": {
+    "s_80a134d04d3a76": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "366154d7-000f-40c5-a26c-1940b51fffc4",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
