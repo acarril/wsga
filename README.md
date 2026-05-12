@@ -21,17 +21,17 @@ net get wsga
 
 ```stata
 use rddsga_synth
-wsga Y Z X1 X2, sgroup(G) bwidth(10) reducedform bsreps(200)
+wsga rdd y m, sgroup(sgroup) running(x) bwidth(0.5) bsreps(200) seed(42)
 ```
 
 ### Quick start (DiD)
 
 ```stata
 use wsga_did_synth
-wsga y m, sgroup(sgroup) design(did) unit(unit) time(time) treat(D) bsreps(200)
+wsga did y m, sgroup(sgroup) unit(unit) time(time) treat(D) bsreps(200) seed(42)
 ```
 
-See `help wsga` for full documentation. The previous command name `rddsga` is retained as a deprecated alias and is installed alongside `wsga`.
+See `help wsga`, `help wsga rdd`, and `help wsga did` for full documentation. The previous command name `rddsga` is retained as a deprecated alias and is installed alongside `wsga`.
 
 ---
 
@@ -49,7 +49,7 @@ devtools::install_github("acarril/wsga")
 library(wsga)
 data(rddsga_synth)
 
-fit <- wsga(
+fit <- wsga_rdd(
   y ~ m | sgroup,
   data    = rddsga_synth,
   running = ~ x,
@@ -67,10 +67,9 @@ summary(fit)   # also shows balance tables
 library(wsga)
 data(wsga_did_synth)
 
-fit <- wsga(
+fit <- wsga_did(
   y ~ m | sgroup,
   data   = wsga_did_synth,
-  design = "did",
   unit   = "unit",
   time   = "time",
   treat  = "D",
@@ -81,7 +80,7 @@ print(fit)
 summary(fit)   # shows aggregate and treated-only balance tables
 ```
 
-See `?wsga`, `vignette("wsga-intro")`, and `vignette("wsga-did-intro")` for full documentation. The previous function name `rddsga()` is retained as a deprecated alias.
+See `?wsga_rdd`, `?wsga_did`, `vignette("wsga-intro")`, and `vignette("wsga-did-intro")` for full documentation. The previous function name `rddsga()` is retained as a deprecated alias.
 
 ---
 

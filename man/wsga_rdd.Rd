@@ -23,6 +23,7 @@ wsga_rdd(
   rbalance = 0L,
   bootstrap = TRUE,
   bsreps = 200L,
+  boot_type = c("pairs", "wild"),
   inference = NULL,
   block_var = NULL,
   fixed_fs = FALSE,
@@ -96,6 +97,14 @@ per replicate)? Default \code{TRUE}.}
 
 \item{bsreps}{Positive integer: number of bootstrap replications. Default \code{200}.}
 
+\item{boot_type}{Character. Bootstrap resampling scheme: \code{"pairs"} (default)
+or \code{"wild"}. \code{"wild"} runs an unrestricted wild cluster bootstrap with
+Rademacher signs and is recommended when the number of clusters is small
+(G < ~30); requires \code{cluster_var} to be set and is not supported with
+\code{model = "iv"}. WCB conditions on the data and does not re-estimate the
+propensity score, so it trades some IPW-uncertainty coverage for better
+size control under H₀.}
+
 \item{inference}{Character. How standard errors, CIs, and p-values are
 computed and reported. One of:
 \itemize{
@@ -113,7 +122,8 @@ the t distribution with the regression residual df. Requires
 resampling. Default \code{NULL} (unstratified). Semantics adapt to
 \code{cluster_var}: when \code{cluster_var} is \code{NULL}, \code{block_var} defines strata
 of rows; when \code{cluster_var} is set, it defines strata of clusters and
-must be constant within each cluster (validated at runtime).}
+must be constant within each cluster (validated at runtime). Ignored
+when \code{boot_type = "wild"}.}
 
 \item{fixed_fs}{Logical. Fixed first-stage bootstrap for IV: bootstrap the
 reduced form and divide by the point-estimate first-stage coefficients.

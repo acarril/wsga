@@ -1,4 +1,4 @@
-v 1.2.0
+v 1.0.3
 d 'WSGA': Weighted subgroup analysis
 d
 d  wsga conducts weighted subgroup analysis for research designs that
@@ -23,7 +23,7 @@ d KW: Inverse probability weighting
 d
 d Requires: Stata version 11
 d
-d Distribution-Date: 20260511
+d Distribution-Date: 20260512
 d
 d Authors: Alvaro Carril
 d          Andre Cazor, PUC Chile

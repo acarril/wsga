@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 1.0.2 2026-05-11}{...}
+{* *! version 1.0.3 2026-05-12}{...}
 {viewerjumpto "Stored results" "wsga_did##results"}{...}
 {title:Title}
 
@@ -43,6 +43,7 @@
 {synopt:{opt seed(#)}}RNG seed for reproducibility{p_end}
 {synopt:{opt fixedps}}hold propensity score fixed across bootstrap reps (diagnostic){p_end}
 {synopt:{opt blockbootstrap(varname)}}stratify the unit-level cluster resample by {it:varname}; must be unit-constant{p_end}
+{synopt:{opt wildcluster}}use wild cluster bootstrap (WCB-U, Rademacher signs) instead of pairs; recommended at < ~30 clusters; ignores {opt blockbootstrap} and does not refit the propensity score (so it does not propagate IPW uncertainty); see {it:Remarks}{p_end}
 {synopt:{opt weights(varname)}}pre-existing observation weights{p_end}
 {synoptline}
 
@@ -70,8 +71,33 @@ Clustering is always on {it:unit}.
 {pstd}IPW-weighted DiD:{p_end}
 {phang2}{cmd:. wsga did Y M, sgroup(G) unit(id) time(t) treat(D) nobootstrap}{p_end}
 
-{pstd}With cluster bootstrap:{p_end}
+{pstd}With cluster bootstrap (pairs):{p_end}
 {phang2}{cmd:. wsga did Y M, sgroup(G) unit(id) time(t) treat(D) bsreps(200) seed(1)}{p_end}
+
+{pstd}With wild cluster bootstrap (recommended at small G):{p_end}
+{phang2}{cmd:. wsga did Y M, sgroup(G) unit(id) time(t) treat(D) bsreps(200) seed(1) wildcluster}{p_end}
+
+
+{marker remarks}{...}
+{title:Remarks on inference}
+
+{pstd}
+The default cluster bootstrap is the pairs-cluster scheme (Cameron, Gelbach &
+Miller 2008): whole units are resampled with replacement, the propensity score
+is refit per replicate, and the IPW-weighted regression is re-estimated.  This
+propagates uncertainty from the propensity-score estimation step.  With fewer
+than ~30 clusters, pairs-cluster bootstrap is known to under-reject under H0;
+a one-time advisory is emitted.{p_end}
+
+{pstd}
+The {opt wildcluster} option requests the unrestricted wild cluster bootstrap
+(WCB-U) with Rademacher signs at the cluster level.  This conditions on the
+data (residuals from the original fit are sign-flipped at the unit level) and
+the regression is refit on the bootstrap outcome.  WCB-U gives substantially
+better size control than pairs at small G.  Caveat: because the data is held
+fixed, the propensity score is {it:not} refit per replicate, so WCB-U does not
+propagate IPW estimation uncertainty.  Use {opt wildcluster} when honest size
+under H0 is the binding concern at small G.{p_end}
 
 
 {marker results}{...}
@@ -110,6 +136,7 @@ Clustering is always on {it:unit}.
 {synopt:{cmd:e(cmd)}}{cmd:wsga}{p_end}
 {synopt:{cmd:e(subcmd)}}{cmd:did}{p_end}
 {synopt:{cmd:e(depvar)}}name of dependent variable{p_end}
+{synopt:{cmd:e(boot_type)}}(bootstrap) {cmd:pairs} or {cmd:wild}{p_end}
 
 {p2col 5 23 26 2: Matrices}{p_end}
 {synopt:{cmd:e(b)}}1{cmd:x}2 coefficient vector with columns named {cmd:G0_Z} and {cmd:G1_Z}{p_end}

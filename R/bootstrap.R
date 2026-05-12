@@ -205,3 +205,134 @@ run_bootstrap <- function(run_one_rep, data, B, est,
   if (!is.null(cluster_var)) result$N_clusters <- N_clusters
   result
 }
+
+
+#' Wild cluster bootstrap (unrestricted, Rademacher signs)
+#'
+#' WCB-U for weighted least squares. The propensity score and IPW weights are
+#' fixed at their original-sample values -- WCB conditions on the data and only
+#' sign-flips residuals at the cluster level, so it does **not** propagate
+#' uncertainty from the propensity-score estimation step. Use pairs bootstrap
+#' if propagating IPW uncertainty matters more than small-G size control.
+#'
+#' Per replicate `b`:
+#'   1. Draw cluster signs `v_g in {-1, +1}` (Rademacher), one per cluster.
+#'   2. Form `y*_i = yhat_i + v_{g(i)} * e_i`, where `yhat` and `e` are the
+#'      original-sample fitted values and raw residuals.
+#'   3. Refit the weighted OLS on `(X, y*)` with the original weights.
+#'   4. Record the two subgroup coefficients.
+#'
+#' The fit uses a cached QR decomposition (X is fixed across replicates), so
+#' each replicate is O(np), not O(np^2).
+#'
+#' @param fit The original `lm` fit returned by `run_model()`.
+#' @param X Full design matrix (n x p) from `build_*_design_matrix()`.
+#' @param y Outcome vector (length n).
+#' @param w Weights vector (length n; kernel * IPW).
+#' @param active Logical mask: rows with `final_wt > 0` used in estimation.
+#' @param cluster_vec Cluster identifier (length n; any type).
+#' @param coef_g0_name,coef_g1_name Column names for the two coefficients of
+#'   interest (always `"G0_Z"` / `"G1_Z"` in this package).
+#' @param B Number of bootstrap replications.
+#' @param seed Optional RNG seed.
+#' @return Same shape as `run_bootstrap()`: list with `draws`, `vcov`, `pval`,
+#'   `ci`, `B_ok`, `failed`, `N_clusters`.
+#' @noRd
+run_wild_bootstrap <- function(fit, X, y, w, active, cluster_vec,
+                               coef_g0_name, coef_g1_name,
+                               B, seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+
+  # Restrict to active rows (the only rows that influenced the fit)
+  X_a <- X[active, , drop = FALSE]
+  y_a <- y[active]
+  w_a <- w[active]
+  c_a <- cluster_vec[active]
+
+  # Drop aliased columns (NA coefficients) so the system is full rank
+  beta_hat <- coef(fit)
+  non_aliased <- names(beta_hat)[!is.na(beta_hat)]
+  beta_clean <- beta_hat[non_aliased]
+  X_clean    <- X_a[, non_aliased, drop = FALSE]
+
+  # Guard: a coefficient of interest aliased away (e.g. perfect Z-by-G collinearity
+  # on the active sample) would silently NA every draw.  Error early instead.
+  missing_coefs <- setdiff(c(coef_g0_name, coef_g1_name), non_aliased)
+  if (length(missing_coefs) > 0) {
+    stop(sprintf(
+      "Wild cluster bootstrap: coefficient(s) %s aliased away by `lm()` -- likely perfect collinearity between the subgroup and treatment indicators on the active sample.",
+      paste(shQuote(missing_coefs), collapse = ", ")))
+  }
+
+  # Fitted values and raw residuals (in the un-transformed scale)
+  y_hat <- as.numeric(X_clean %*% beta_clean)
+  e     <- y_a - y_hat
+
+  # Cluster bookkeeping
+  if (any(is.na(c_a))) {
+    stop(sprintf(
+      "Wild cluster bootstrap: cluster variable has %d NA value(s) in the active sample.",
+      sum(is.na(c_a))))
+  }
+  unique_clusters <- unique(c_a)
+  N_clusters      <- length(unique_clusters)
+  if (N_clusters < 2L) {
+    stop(sprintf(
+      "Wild cluster bootstrap requires at least 2 clusters; found %d in the active sample.",
+      N_clusters))
+  }
+  cluster_idx <- match(as.character(c_a), as.character(unique_clusters))
+
+  # Cache QR of the weighted design -- refits are then a single qr.coef() call.
+  sqrt_w <- sqrt(w_a)
+  X_w    <- sqrt_w * X_clean
+  qr_X   <- qr(X_w)
+  if (qr_X$rank < ncol(X_clean)) {
+    stop("Wild cluster bootstrap: weighted design matrix is rank-deficient.")
+  }
+
+  draws <- matrix(NA_real_, nrow = B, ncol = 2,
+                  dimnames = list(NULL, c("g0", "g1")))
+
+  message(sprintf("Wild cluster bootstrap (%d):", B))
+  for (i in seq_len(B)) {
+    signs   <- sample(c(-1, 1), N_clusters, replace = TRUE)
+    v       <- signs[cluster_idx]
+    y_star  <- y_hat + v * e
+    y_w     <- sqrt_w * y_star
+    beta_b  <- tryCatch(qr.coef(qr_X, y_w), error = function(e) NULL)
+    if (!is.null(beta_b)) {
+      names(beta_b) <- non_aliased
+      draws[i, "g0"] <- beta_b[[coef_g0_name]]
+      draws[i, "g1"] <- beta_b[[coef_g1_name]]
+    }
+    if (i %% 10 == 0 || i == B) cat(sprintf("\r  %d/%d", i, B))
+  }
+  cat("\n")
+
+  ok       <- complete.cases(draws)
+  if (any(!ok)) {
+    warning(sprintf("%d of %d wild bootstrap replicates failed and were dropped.",
+                    sum(!ok), B))
+  }
+  draws_ok <- draws[ok, , drop = FALSE]
+  B_ok     <- nrow(draws_ok)
+
+  draws_ok <- cbind(draws_ok, diff = draws_ok[, "g1"] - draws_ok[, "g0"])
+  V_boot   <- var(draws_ok[, c("g0", "g1")])
+  est_all  <- c(g0 = beta_clean[[coef_g0_name]],
+                g1 = beta_clean[[coef_g1_name]])
+  est_all  <- c(est_all, diff = est_all[["g1"]] - est_all[["g0"]])
+
+  pval <- sapply(seq_len(3), function(g) {
+    cnt <- sum(abs(draws_ok[, g] - est_all[g]) >= abs(est_all[g]))
+    (1 + cnt) / (B_ok + 1)
+  })
+  names(pval) <- c("g0", "g1", "diff")
+
+  ci <- apply(draws_ok, 2, quantile, probs = c(0.025, 0.975))
+  rownames(ci) <- c("lb", "ub")
+
+  list(draws = draws_ok, vcov = V_boot, pval = pval, ci = ci,
+       B_ok = B_ok, failed = sum(!ok), N_clusters = N_clusters)
+}

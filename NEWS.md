@@ -1,5 +1,36 @@
 # wsga (R package) NEWS
 
+## wsga 1.0.3 (2026-05-12)
+
+### New features
+
+- **R**: New `boot_type = c("pairs", "wild")` argument on `wsga_rdd()` and
+  `wsga_did()`. When `"wild"`, runs an unrestricted wild cluster bootstrap
+  (WCB-U) with Rademacher signs at the cluster level. Recommended at small
+  G (< ~30 clusters), where pairs over-rejects under H0 (Cameron, Gelbach &
+  Miller 2008). Requires `cluster_var` to be set; not supported with
+  `model = "iv"` (#30).
+- **Stata**: New `wildcluster` option on `wsga did`. Same WCB-U scheme as
+  the R implementation: predicts the fitted values (`xbu`) and idiosyncratic
+  residuals (`e`) from the main `xtreg, fe` fit, then sign-flips residuals
+  at the unit level per replicate and refits the weighted regression. New
+  `e(boot_type)` macro records which scheme ran (#30).
+- **Both**: the G < 30 advisory now recommends the wild-cluster option
+  directly (previously pointed to external tools).
+
+### Notes
+
+- WCB conditions on the data and does not refit the propensity score, so it
+  does not propagate IPW estimation uncertainty. This is a deliberate
+  tradeoff for better size control at small G; use the pairs bootstrap
+  (default) if IPW uncertainty propagation matters more.
+- Stata RDD WCB is deferred to a follow-up: `_wsga_rdd_myboo` does not
+  currently expose a `cluster()` path, which is a prerequisite refactor.
+- Bump also unifies pre-existing version drift in `stata/wsga.pkg`,
+  `stata/rddsga.pkg`, and `stata/stata.toc`.
+
+---
+
 ## wsga 1.0.2 (2026-05-11)
 
 ### Bug fixes
