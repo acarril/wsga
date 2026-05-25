@@ -1,6 +1,6 @@
-*! 1.0.3 Alvaro Carril 2026-05-12
+*! 1.1.0 Alvaro Carril 2026-05-25
 
-// ── Dispatcher ────────────────────────────────────────────────────────────────
+// -- Dispatcher ----------------------------------------------------------------
 program define wsga
   version 11.1
   gettoken sub rest : 0, parse(" ")
@@ -18,7 +18,7 @@ program define wsga
   }
 end
 
-// ── RDD implementation ────────────────────────────────────────────────────────
+// -- RDD implementation --------------------------------------------------------
 program define _wsga_rdd, eclass
 version 11.1
 syntax varlist(min=1 numeric fv) [if] [in], ///
@@ -30,7 +30,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     noBOOTstrap bsreps(real 200) FIXEDbootstrap FIXEDps BLOCKbootstrap(string) NORMal noipsw weights(string) ///
     Seed(string) ]
 
-// ─── Validate required options ────────────────────────────────────────────────
+// --- Validate required options ------------------------------------------------
 if `bwidth' < 0 {
   di as error "bwidth() is required and must be positive."
   exit 198
@@ -39,7 +39,7 @@ if ("`ivregress'" != "" | "`firststage'" != "") & "`fuzzy'" == "" {
   di as error "fuzzy() must be specified with ivregress or firststage."
   exit 198
 }
-// ──────────────────────────────────────────────────────────────────────────────
+// ------------------------------------------------------------------------------
 
 *-------------------------------------------------------------------------------
 * Check inputs
@@ -536,9 +536,9 @@ if "`ivregress'" != "" | "`reducedform'" != "" | "`firststage'" != "" {
       }
       else {
         // Empirical (percentile) bootstrap CIs and (1+count)/(B+1) p-values
-        scalar p_g`g'     = e(pval`g')
-        scalar ci_lb_g`g' = e(lb_g`g')
-        scalar ci_ub_g`g' = e(ub_g`g')
+        scalar p_g`g'     = e(p_g`g')
+        scalar ci_lb_g`g' = e(ci_lb_g`g')
+        scalar ci_ub_g`g' = e(ci_ub_g`g')
       }
     }
     else {
@@ -568,15 +568,30 @@ if "`ivregress'" != "" | "`reducedform'" != "" | "`firststage'" != "" {
     }
     else {
       // Empirical (percentile) bootstrap CIs and (1+count)/(B+1) p-values
-      scalar p_diff     = e(pval_diff)
-      scalar ci_lb_diff = e(lb_diff)
-      scalar ci_ub_diff = e(ub_diff)
+      scalar p_diff     = e(p_diff)
+      scalar ci_lb_diff = e(ci_lb_diff)
+      scalar ci_ub_diff = e(ci_ub_diff)
     }
   }
   else {
     scalar p_diff     = ttail(df, abs(t_diff))*2
     scalar ci_lb_diff = b_diff + invttail(df, 0.975)*se_diff
     scalar ci_ub_diff = b_diff + invttail(df, 0.025)*se_diff
+  }
+
+  // #32: _wsga_rdd_myboo posts these as empirical percentiles. Overwrite
+  // with mode-aware locals so e() matches the displayed CI columns.
+  // Empirical mode is a no-op (locals were just read from e()).
+  if "`bootstrap'" != "nobootstrap" {
+    ereturn scalar p_g0      = p_g0
+    ereturn scalar p_g1      = p_g1
+    ereturn scalar p_diff    = p_diff
+    ereturn scalar ci_lb_g0  = ci_lb_g0
+    ereturn scalar ci_ub_g0  = ci_ub_g0
+    ereturn scalar ci_lb_g1  = ci_lb_g1
+    ereturn scalar ci_ub_g1  = ci_ub_g1
+    ereturn scalar ci_lb_diff = ci_lb_diff
+    ereturn scalar ci_ub_diff = ci_ub_diff
   }
 
 
@@ -836,7 +851,7 @@ program define _wsga_rdd_myboo, eclass
       if abs(bscoef - b[1,`=`g'+1']) >= abs(b[1,`=`g'+1']) local count = `count'+1
     }
     scalar pval`g' = (1+`count') / (`B' + 1)
-    ereturn scalar pval`g' = pval`g'
+    ereturn scalar p_g`g' = pval`g'
   }
   // Empirical p-value for diff (column 3)
   scalar orig_diff = b[1,2] - b[1,1]
@@ -846,24 +861,24 @@ program define _wsga_rdd_myboo, eclass
     if abs(bscoef - orig_diff) >= abs(orig_diff) local count_diff = `count_diff' + 1
   }
   scalar pval_diff = (1 + `count_diff') / (`B' + 1)
-  ereturn scalar pval_diff = pval_diff
+  ereturn scalar p_diff = pval_diff
   // Empirical confidence intervals
   svmat cumulative, names(_subgroup)
   forvalues g = 0/1 {
     qui centile _subgroup`=`g'+1', centile(2.5 97.5)
     drop _subgroup`=`g'+1'
     scalar lb_g`g' = r(c_1)
-    ereturn scalar lb_g`g' = lb_g`g'
+    ereturn scalar ci_lb_g`g' = lb_g`g'
     scalar ub_g`g' = r(c_2)
-    ereturn scalar ub_g`g' = ub_g`g'
+    ereturn scalar ci_ub_g`g' = ub_g`g'
   }
   // Empirical CI for diff (column 3)
   qui centile _subgroup3, centile(2.5 97.5)
   drop _subgroup3
   scalar lb_diff = r(c_1)
-  ereturn scalar lb_diff = lb_diff
+  ereturn scalar ci_lb_diff = lb_diff
   scalar ub_diff = r(c_2)
-  ereturn scalar ub_diff = ub_diff
+  ereturn scalar ci_ub_diff = ub_diff
   // Post results: macros
   foreach macro of local macros {
     if "`macro'" == "clustvar" continue
@@ -1151,11 +1166,11 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     WILDcluster ///
     NORMal noipsw weights(string) Seed(string) ]
 
-  // ── Sample mask
+  // -- Sample mask
   marksample touse, novarlist
   markout `touse' `unit' `time' `treat' `sgroup'
 
-  // ── wildcluster validation: requires the bootstrap loop (it IS the loop).
+  // -- wildcluster validation: requires the bootstrap loop (it IS the loop).
   if "`wildcluster'" != "" & "`bootstrap'" == "nobootstrap" {
     di as error ///
 "option {bf:wildcluster} requires the bootstrap loop; cannot be combined with {bf:nobootstrap}."
@@ -1166,7 +1181,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
 "Note: {bf:blockbootstrap} is ignored under {bf:wildcluster} (Rademacher signs are drawn unstratified)."
   }
 
-  // ── Outcome and covariates
+  // -- Outcome and covariates
   local depvar : word 1 of `varlist'
   local covariates : list varlist - depvar
 
@@ -1176,7 +1191,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   if "`pscore'" != "" confirm new variable `pscore'
   else tempvar pscore
 
-  // ── Validate: time has exactly 2 unique non-missing values
+  // -- Validate: time has exactly 2 unique non-missing values
   qui levelsof `time' if `touse', local(t_vals)
   local n_tvals : word count `t_vals'
   if `n_tvals' != 2 {
@@ -1185,7 +1200,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     exit 198
   }
 
-  // ── Resolve post_value
+  // -- Resolve post_value
   if "`post_value'" == "" {
     qui summarize `time' if `touse', meanonly
     local post_value = r(max)
@@ -1202,7 +1217,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     }
   }
 
-  // ── Unit-constancy checks (treat, sgroup, balance moderators, blockbootstrap)
+  // -- Unit-constancy checks (treat, sgroup, balance moderators, blockbootstrap)
   foreach v in `treat' `sgroup' `balance' `blockbootstrap' {
     tempvar _dist
     qui by `unit' (`v'), sort: gen byte `_dist' = (`v'[1] != `v'[_N])
@@ -1215,7 +1230,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     drop `_dist'
   }
 
-  // ── Build design variables
+  // -- Build design variables
   tempvar G0 G1 post G0_Z G1_Z G0_post G1_post
   qui gen byte `G0'      = (`sgroup' == 0)
   qui gen byte `G1'      = (`sgroup' == 1)
@@ -1225,7 +1240,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   qui gen byte `G0_post' = `G0' * `post'
   qui gen byte `G1_post' = `G1' * `post'
 
-  // ── Covariate × G interactions
+  // -- Covariate - G interactions
   local g0_covs ""
   local g1_covs ""
   foreach v of local covariates {
@@ -1236,9 +1251,9 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     local g1_covs "`g1_covs' `g1_`v''"
   }
 
-  // ── IPW: fit logit/probit on (G, balance) and compute weights.
+  // -- IPW: fit logit/probit on (G, balance) and compute weights.
   // Because G and the moderators are unit-constant (validated above), fitting
-  // on the long panel produces unit-constant pscore values — the per-row
+  // on the long panel produces unit-constant pscore values - the per-row
   // values are correct as-is and no broadcast is required.
   // When comsup is specified, units outside the G=1 pscore range are excluded.
   qui gen double `pscore'    = .
@@ -1301,7 +1316,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     qui replace `ipsweight' = 0 if mi(`ipsweight')
   }
 
-  // ── Estimate: long-form TWFE with unit FE absorbed via xtreg, fe.
+  // -- Estimate: long-form TWFE with unit FE absorbed via xtreg, fe.
   // Weights enter as pweights so SE machinery is consistent with sampling-
   // weight semantics.  When noipsw / no balance, ipsweight is identically 1.
   qui xtset `unit'
@@ -1310,7 +1325,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   tempvar _did_esample
   gen byte `_did_esample' = e(sample)
 
-  // ── Extract coefficients of interest
+  // -- Extract coefficients of interest
   scalar b_g0   = _b[`G0_Z']
   scalar b_g1   = _b[`G1_Z']
   scalar b_diff = b_g1 - b_g0
@@ -1339,7 +1354,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   scalar ci_lb_diff = b_diff + invttail(df, 0.975)*se_diff
   scalar ci_ub_diff = b_diff + invttail(df, 0.025)*se_diff
 
-  // ── Cluster bootstrap.
+  // -- Cluster bootstrap.
   // Two paths:
   //   - Pairs (default): whole units are resampled with replacement; fresh
   //     unit IDs are assigned via bsample's idcluster() so unit FE remain
@@ -1388,7 +1403,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
       qui use `_wsga_did_panel', clear
       capture {
         if "`wildcluster'" != "" {
-          // ─── WCB-U: Rademacher signs, one per unit, broadcast to all rows.
+          // --- WCB-U: Rademacher signs, one per unit, broadcast to all rows.
           tempvar _wsga_u _wsga_sign _wsga_ystar
           qui by `unit', sort: gen double `_wsga_u' = runiform() if _n == 1
           qui by `unit': replace `_wsga_u' = `_wsga_u'[1]
@@ -1533,7 +1548,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     restore
   }
 
-  // ── Display
+  // -- Display
   local _stat_label = cond(use_bootstrap, "z", "t")
   local _p_label    = cond(use_bootstrap, "P>|z|", "P>|t|")
   local _ci_tag     = cond(use_bootstrap & "`normal'" == "", " (emp.)", "")
@@ -1586,9 +1601,9 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
        as text "' (" as result %4.0f N_clust as text " clusters)"
   }
 
-  // ── Balance tables (aggregate + treated-only).  Per Q9a, in DiD mode
+  // -- Balance tables (aggregate + treated-only).  Per Q9a, in DiD mode
   // balance is reported both on the full active sample and conditional on
-  // treat == 1 — the paper recommends checking the treated-only table since
+  // treat == 1 - the paper recommends checking the treated-only table since
   // the parallel-trends assumption is on the treated.
   if `: list sizeof balance' > 0 {
     forvalues _bidx = 1/2 {
@@ -1642,7 +1657,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     }
   }
 
-  // ── Post clean e(b)/e(V) trimmed to the two treatment-effect columns.
+  // -- Post clean e(b)/e(V) trimmed to the two treatment-effect columns.
   // Analytic case: cov_01 comes from xtreg's VCV.
   // Bootstrap case: cov_01 is overwritten above with the bootstrap covariance.
   matrix _b_did = (b_g0, b_g1)

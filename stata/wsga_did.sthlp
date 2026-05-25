@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 1.0.3 2026-05-12}{...}
+{* *! version 1.1.0 2026-05-25}{...}
 {viewerjumpto "Stored results" "wsga_did##results"}{...}
 {title:Title}
 
@@ -30,7 +30,7 @@
 {syntab:IPW}
 {synopt:{opt balance(varlist)}}moderators for propensity score; defaults to covariates{p_end}
 {synopt:{opt noipsw}}skip IPW reweighting{p_end}
-{synopt:{opt m(#)}}weighting mode: 2 = both groups (default), 1 = G1→G0, 0 = G0→G1{p_end}
+{synopt:{opt m(#)}}weighting mode: 2 = both groups (default), 1 = G1->G0, 0 = G0->G1{p_end}
 {synopt:{opt probit}}use probit instead of logit for propensity score{p_end}
 {synopt:{opt comsup}}restrict to common propensity score support (units outside the G=1 pscore range are dropped from estimation){p_end}
 {synopt:{opt ipsweight(newvar)}}save IPW weights to {it:newvar} in the dataset{p_end}
@@ -59,7 +59,7 @@ across subgroups.
 
 {pstd}
 The cluster bootstrap resamples whole units with replacement and assigns fresh
-unit IDs per draw so fixed effects remain identified (Cameron–Gelbach–Miller).
+unit IDs per draw so fixed effects remain identified (Cameron-Gelbach-Miller).
 Clustering is always on {it:unit}.
 
 
