@@ -1,5 +1,39 @@
 # wsga (R package) NEWS
 
+## wsga 1.1.0 (2026-05-25)
+
+### Breaking changes
+
+- **Stata**: `wsga rdd` e-class return names standardized to match `wsga did`.
+  RDD previously posted `e(lb_g0)`, `e(ub_g0)`, `e(lb_g1)`, `e(ub_g1)`,
+  `e(lb_diff)`, `e(ub_diff)`, `e(pval0)`, `e(pval1)`, `e(pval_diff)`. These
+  are now `e(ci_lb_g0)`, `e(ci_ub_g0)`, `e(ci_lb_g1)`, `e(ci_ub_g1)`,
+  `e(ci_lb_diff)`, `e(ci_ub_diff)`, `e(p_g0)`, `e(p_g1)`, `e(p_diff)`,
+  matching what `wsga did` already returned. Downstream code reading these
+  values from `wsga rdd` must be updated.
+
+### Bug fixes
+
+- **Stata**: `wsga rdd` now overwrites `e(p_g0)`, `e(p_g1)`, `e(p_diff)`,
+  `e(ci_lb_g0)`, `e(ci_ub_g0)`, `e(ci_lb_g1)`, `e(ci_ub_g1)`, `e(ci_lb_diff)`,
+  `e(ci_ub_diff)` with the mode-aware locals after the display block.
+  Previously `_wsga_rdd_myboo` posted these unconditionally as empirical
+  percentiles, so when `normal` was specified the displayed CI columns and
+  p-values were correct but the e-class returns silently kept the empirical
+  values. Empirical mode is a no-op (#32).
+- **Stata**: stripped non-ASCII characters from `wsga.ado`, `wsga_rdd.sthlp`,
+  `wsga_did.sthlp`, and `NEWS.md` to satisfy the repository's ASCII-only
+  policy. No semantic content changed.
+
+### Internal
+
+- New `stata/tests/smoke_inference_modes.do`: 18 checks (9 RDD + 9 DiD)
+  asserting `e()` CI bounds and p-values differ between empirical and normal
+  modes (regression guard for #32). Now uses a unified key list across
+  both designs, courtesy of the rename above.
+
+---
+
 ## wsga 1.0.3 (2026-05-12)
 
 ### New features
@@ -38,7 +72,7 @@
 - **Stata**: `wsga did` now correctly wires up `ipsweight()` and `pscore()` as
   named output variables in the dataset (previously accepted but silently
   ignored) (#25).
-- **Stata**: `wsga did` now implements `comsup` — units outside the G=1
+- **Stata**: `wsga did` now implements `comsup` -- units outside the G=1
   propensity score range are excluded from estimation and a `comsup` variable
   is created in the dataset, matching RDD behavior. Common support is
   re-evaluated per bootstrap replicate (#25).
@@ -79,27 +113,27 @@
 
 ### New features
 
-- **`design = "did"`**: sharp 2-period DiD-SGA pipeline. New required arguments `unit`, `time`, `treat`; optional `post_value` (defaults to `max(time)`). Runs long-form TWFE with subgroup × post interactions, IPW reweighting, and pairs cluster bootstrap over units (Cameron-Gelbach-Miller) by default.
-- **`inference` argument**: three-mode inference — `"empirical"` (default with bootstrap, percentile CIs), `"normal"` (normal-approx from bootstrap SE), `"analytical"` (sandwich/cluster-robust, no bootstrap).
+- **`design = "did"`**: sharp 2-period DiD-SGA pipeline. New required arguments `unit`, `time`, `treat`; optional `post_value` (defaults to `max(time)`). Runs long-form TWFE with subgroup x post interactions, IPW reweighting, and pairs cluster bootstrap over units (Cameron-Gelbach-Miller) by default.
+- **`inference` argument**: three-mode inference -- `"empirical"` (default with bootstrap, percentile CIs), `"normal"` (normal-approx from bootstrap SE), `"analytical"` (sandwich/cluster-robust, no bootstrap).
 - **`fixed_ps`**: opt-in flag to hold the propensity score fixed at the original-sample fit across bootstrap replicates. Useful for variance decomposition. Default `FALSE`.
 - **`cluster_var`**: drives both analytical SEs and the bootstrap. DiD defaults to clustering on `unit`. One-time warning when fewer than 30 unique clusters are present.
-- **Bundled dataset**: `wsga_did_synth` — balanced 2-period panel of 500 units (seed = 7). True effects `tau_0 = 1`, `tau_1 = 3`.
+- **Bundled dataset**: `wsga_did_synth` -- balanced 2-period panel of 500 units (seed = 7). True effects `tau_0 = 1`, `tau_1 = 3`.
 - **DiD balance tables**: aggregate and treated-only (D = 1) balance, each unweighted and IPW-weighted.
 - **Vignette**: `vignette("wsga-did-intro")` walks through the full DiD workflow.
-- **`bsreps` default** bumped 50 → 200.
+- **`bsreps` default** bumped 50 -> 200.
 
 ### Breaking changes
 
-- Balance accessor: `fit$balance$unweighted$table` → `fit$balance$unweighted$aggregate$table` (nested structure to accommodate the DiD treated-only block).
+- Balance accessor: `fit$balance$unweighted$table` -> `fit$balance$unweighted$aggregate$table` (nested structure to accommodate the DiD treated-only block).
 - Default `bsreps` changed from 50 to 200.
 
 ### Package rename (from rddsga)
 
-- Package renamed `rddsga` → `wsga`. The old function `rddsga()` was retained as a deprecated alias (now forwards to `wsga_rdd()`). Plan to remove in v2.
+- Package renamed `rddsga` -> `wsga`. The old function `rddsga()` was retained as a deprecated alias (now forwards to `wsga_rdd()`). Plan to remove in v2.
 
 ---
 
-## rddsga 0.3.0 → wsga 0.6.x (internal milestones)
+## rddsga 0.3.0 -> wsga 0.6.x (internal milestones)
 
 - Umbrella refactor: single `wsga()` entry point dispatching both RD and DiD paths (replaced by `wsga_rdd()` / `wsga_did()` in 1.0.0).
 - S3 methods: `print`, `summary`, `coef`, `vcov`, `confint`, `nobs`.
@@ -110,7 +144,7 @@
 
 ---
 
-## rddsga 0.2.x / 0.3.0 (2018–2023)
+## rddsga 0.2.x / 0.3.0 (2018-2023)
 
 Initial CRAN-adjacent R implementation of the RDD-SGA estimator accompanying
 the working paper "Weighted Subgroup Analysis in Regression Discontinuity
