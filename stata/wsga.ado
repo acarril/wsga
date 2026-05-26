@@ -1,4 +1,4 @@
-*! 1.1.0 Alvaro Carril 2026-05-25
+*! 1.2.0 Alvaro Carril 2026-05-26
 
 // -- Dispatcher ----------------------------------------------------------------
 program define wsga
@@ -28,6 +28,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     BALance(varlist numeric) DIBALance probit ///
     IVregress REDUCEDform FIRSTstage vce(string) p(int 1) m(int 2) rbalance(int 0) ///
     noBOOTstrap bsreps(real 200) FIXEDbootstrap FIXEDps BLOCKbootstrap(string) NORMal noipsw weights(string) ///
+    CLuster(varname) WILDcluster ///
     Seed(string) ]
 
 // --- Validate required options ------------------------------------------------
@@ -38,6 +39,25 @@ if `bwidth' < 0 {
 if ("`ivregress'" != "" | "`firststage'" != "") & "`fuzzy'" == "" {
   di as error "fuzzy() must be specified with ivregress or firststage."
   exit 198
+}
+if "`wildcluster'" != "" & "`bootstrap'" == "nobootstrap" {
+  di as error ///
+"option {bf:wildcluster} requires the bootstrap loop; cannot be combined with {bf:nobootstrap}."
+  exit 198
+}
+if "`wildcluster'" != "" & "`cluster'" == "" {
+  di as error ///
+"option {bf:wildcluster} requires {bf:cluster(varname)}; no natural default for RDD."
+  exit 198
+}
+if "`wildcluster'" != "" & "`ivregress'" != "" {
+  di as error ///
+"option {bf:wildcluster} is not supported with {bf:ivregress} (fuzzy RD via 2SLS); WCB on a 2SLS fit needs a different recipe."
+  exit 198
+}
+if "`wildcluster'" != "" & "`blockbootstrap'" != "" {
+  di as text ///
+"Note: {bf:blockbootstrap} is ignored under {bf:wildcluster} (Rademacher signs are drawn unstratified)."
 }
 // ------------------------------------------------------------------------------
 
@@ -338,6 +358,18 @@ if "`ipsw'" != "noipsw" & `: list sizeof balance' > 0 {
   if "`comsup'" != "" local psw_boot_opts `psw_boot_opts' comsup
 }
 if "`seed'" != "" local psw_boot_opts `psw_boot_opts' seed(`seed')
+if "`cluster'" != "" local psw_boot_opts `psw_boot_opts' cluster(`cluster')
+if "`wildcluster'" != "" local psw_boot_opts `psw_boot_opts' wildcluster
+
+// G < 30 advisory when clustering is active
+if "`cluster'" != "" & "`bootstrap'" != "nobootstrap" {
+  qui levelsof `cluster' if `touse' & `bwidth', local(_clusters)
+  local _N_clust : word count `_clusters'
+  if `_N_clust' < 30 & "`wildcluster'" == "" {
+    di as text ///
+"Note: pairs-cluster bootstrap with " as result %4.0f `_N_clust' as text " clusters.  With fewer than ~30 clusters, pairs over-rejects under H0; consider the {bf:wildcluster} option for better size control (Cameron, Gelbach & Miller 2008)."
+  }
+}
 
 * First stage
 *-------------------------------------------------------------------------------
@@ -713,7 +745,8 @@ end
 program define _wsga_rdd_myboo, eclass
   syntax anything [, PSW IPSWeight(name) KERNELipsw(name) KWT(name) ///
     TOuse(name) BWIDTH(string) BALance(varlist) OWeights(name) ///
-    M(integer 2) BINarymodel(string) PSCore(name) COmsup Seed(string)]
+    M(integer 2) BINarymodel(string) PSCore(name) COmsup Seed(string) ///
+    CLuster(varname) WILDcluster]
 
   local svar : word 1 of `anything'
   local cvar : word 2 of `anything'
@@ -738,15 +771,51 @@ program define _wsga_rdd_myboo, eclass
   matrix b = b[1, "0.`svar'#1.`cvar'".."1.`svar'#1.`cvar'"]
   matrix colnames b = 0.`svar'#1.`cvar' 1.`svar'#1.`cvar'
 
+  // -- Cluster bootstrap setup. Two paths share this myboo body:
+  //    - Pairs (default; cluster() optional): bsample resamples rows or whole
+  //      clusters with replacement; PS refit per replicate; refits e(cmdline).
+  //    - Wild (`wildcluster' + `cluster'): WCB-U with Rademacher signs at the
+  //      cluster level. Captures xb and residuals from the main fit, sign-flips
+  //      per replicate, refits e(cmdline) on y_star. No PS refit (conditions on
+  //      data; does not propagate IPW uncertainty -- intentional, CGM 2008).
+  local _saved_cmdline = e(cmdline)
+  local _saved_depvar  = e(depvar)
+  if "`wildcluster'" != "" {
+    tempvar _wsga_xb _wsga_resid
+    qui predict double `_wsga_xb'    if `esample', xb
+    qui predict double `_wsga_resid' if `esample', residuals
+  }
+
   // Start bootstrap
   di ""
-  _dots 0, title(Bootstrap replications) reps(`B')
+  local _boot_title = cond("`wildcluster'" != "", "Wild cluster bootstrap", ///
+                        cond("`cluster'" != "", "Cluster bootstrap", "Bootstrap replications"))
+  _dots 0, title(`_boot_title') reps(`B')
   cap mat drop cumulative
   if "`seed'" != "" set seed `seed'
   tempvar COMSUP_b
   forvalues i=1/`B' {
     preserve
-    bsample, strata(`e(blockbootstrap)')
+    if "`wildcluster'" != "" {
+      // WCB-U: draw one Rademacher sign per cluster, broadcast to rows,
+      // y_star = xb + sign * resid; refit on y_star.
+      tempvar _wsga_u _wsga_sign _wsga_ystar
+      qui by `cluster', sort: gen double `_wsga_u' = runiform() if _n == 1
+      qui by `cluster': replace `_wsga_u' = `_wsga_u'[1]
+      qui gen double `_wsga_sign'  = cond(`_wsga_u' < 0.5, -1, 1) if `esample'
+      qui gen double `_wsga_ystar' = `_wsga_xb' + `_wsga_sign' * `_wsga_resid' if `esample'
+      qui replace `_saved_depvar' = `_wsga_ystar' if `esample'
+      qui `_saved_cmdline'
+      // Skip PS refit block below; jump to coefficient extraction
+    }
+    else {
+      // Pairs bootstrap (with or without cluster, with or without strata)
+      if "`cluster'" != "" {
+        bsample, cluster(`cluster') strata(`e(blockbootstrap)')
+      }
+      else {
+        bsample, strata(`e(blockbootstrap)')
+      }
 
     // Re-estimate propensity score on bootstrap sample
     if "`psw'" != "" {
@@ -805,7 +874,8 @@ program define _wsga_rdd_myboo, eclass
       qui replace `kernelipsw' = `ipsweight' * `kwt'
     }
 
-    qui `e(cmdline)'
+      qui `e(cmdline)'
+    }
     tempname this_run
     // Non-IV or bootstrap-both-stages
     if IndIV[1,1]==0 | fixed[1,1]==0 {
@@ -833,6 +903,12 @@ program define _wsga_rdd_myboo, eclass
   // Add names to V
   mat rownames V = 0.`svar'#1.`cvar' 1.`svar'#1.`cvar'
   mat colnames V = 0.`svar'#1.`cvar' 1.`svar'#1.`cvar'
+  // Count clusters in the estimation sample BEFORE ereturn post (which
+  // consumes the esample tempvar).
+  if "`cluster'" != "" {
+    qui levelsof `cluster' if `esample', local(_clusters)
+    local _N_clust : word count `_clusters'
+  }
   // Return
   ereturn post, esample(`esample')
   // Post results: scalars
@@ -840,7 +916,13 @@ program define _wsga_rdd_myboo, eclass
     ereturn scalar `scalar' = ``scalar''
   }
   ereturn scalar N_reps = `B'
+  ereturn scalar B_ok   = `B'
   ereturn scalar level = 95
+  if "`cluster'" != "" {
+    ereturn scalar N_clust = `_N_clust'
+    ereturn local clustvar `cluster'
+  }
+  ereturn local boot_type = cond("`wildcluster'" != "", "wild", "pairs")
   // Empirical p-values for subgroups
   // Recentered: count draws where |draw - est| >= |est|, testing H0: coef=0
   cap scalar drop bscoef
