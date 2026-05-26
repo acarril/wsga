@@ -1,5 +1,16 @@
 # wsga (R package) NEWS
 
+## wsga 1.2.1 (2026-05-26)
+
+### Documentation
+
+- Update the `wsga-version-bump` skill to include a post-merge Step 8
+  for tagging the release commit and publishing it via `gh release create`.
+  Codifies the release-per-version-bump policy adopted retroactively when
+  v1.0.1 through v1.2.0 were backfilled.
+
+---
+
 ## wsga 1.2.0 (2026-05-26)
 
 ### New features

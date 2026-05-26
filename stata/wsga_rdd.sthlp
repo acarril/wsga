@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 1.2.0 2026-05-26}{...}
+{* *! version 1.2.1 2026-05-26}{...}
 {viewerjumpto "Stored results" "wsga_rdd##results"}{...}
 {title:Title}
 

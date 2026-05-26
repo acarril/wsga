@@ -144,6 +144,38 @@ chore(release): bump version to X.Y.Z
 R and Stata DiD; see preceding commit and NEWS.md.">
 ```
 
+## Step 8 — Post-merge: tag and release on GitHub
+
+After the PR merges to `main`, create a GitHub release for the new version. Every version bump corresponds to a release — see the rationale in the repo's release strategy (R users can pin via `devtools::install_github("acarril/wsga@vX.Y.Z")`; methods papers citing the package need stable references).
+
+Triggered when the user (or you) confirms the merge has landed. Run from `main` after a `git pull`:
+
+```bash
+# Extract this version's NEWS section into a temp file
+awk -v v="X.Y.Z" '
+  $0 ~ "^## wsga " v " " { in_section = 1; next }
+  /^---$/ && in_section { exit }
+  in_section { print }
+' NEWS.md > /tmp/wsga_release_notes.md
+
+# Tag the merge commit (we are on main, so HEAD is the merge commit)
+git tag -a vX.Y.Z -m "wsga X.Y.Z"
+git push origin vX.Y.Z
+
+# Create the GH release
+gh release create vX.Y.Z --repo acarril/wsga \
+  --title "wsga X.Y.Z" \
+  --notes-file /tmp/wsga_release_notes.md
+```
+
+If you're backfilling releases for past version bumps (because the tag/release was missed earlier), tag at the merge commit of the PR that introduced that version. Find it via:
+
+```bash
+git log --first-parent main --oneline | grep "Merge pull request #<N>"
+```
+
+and pass the SHA as a positional argument to `git tag -a vX.Y.Z <sha> -m "..."`. The release is non-blocking — if the user wants to do it themselves through the GitHub UI, the tag+push is enough; they can `gh release create` later.
+
 ## Notes for the next maintainer
 
 - The version drift problem is real: in practice, the `.pkg` files and `stata.toc` have repeatedly fallen out of sync with `DESCRIPTION`. If you encounter drift mid-bump, target everything at the same new version and mention the drift in `NEWS.md` so the resolution is logged.
