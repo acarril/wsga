@@ -1,0 +1,26 @@
+man/wsga_rdd.Rd
+  s_4b929bccf076dd::t_7440ac0e76872d 100-116,136
+R/wsga.R
+  s_4b929bccf076dd::t_0f93c2d147fc45 52-66
+  s_4b929bccf076dd::t_35c73d409e2406 82
+  s_4b929bccf076dd::t_db2f09f6109891 258-260
+  s_4b929bccf076dd::t_b089ed072c7b26 265
+man/wsga_did.Rd
+  s_4b929bccf076dd::t_7440ac0e76872d 77-79,86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "9b637449e4c43517fc829fafe09475b6c0248dcc",
+  "prompts": {},
+  "sessions": {
+    "s_4b929bccf076dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6947628-cd33-4583-be86-f617be7d520c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
