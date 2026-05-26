@@ -1,4 +1,4 @@
-*! 1.2.1 Alvaro Carril 2026-05-26
+*! 1.2.2 Alvaro Carril 2026-05-26
 
 // -- Dispatcher ----------------------------------------------------------------
 program define wsga
@@ -361,8 +361,16 @@ if "`seed'" != "" local psw_boot_opts `psw_boot_opts' seed(`seed')
 if "`cluster'" != "" local psw_boot_opts `psw_boot_opts' cluster(`cluster')
 if "`wildcluster'" != "" local psw_boot_opts `psw_boot_opts' wildcluster
 
-// G < 30 advisory when clustering is active
+// Cluster validation + G < 30 advisory when clustering is active
 if "`cluster'" != "" & "`bootstrap'" != "nobootstrap" {
+  // Missing cluster IDs in the active sample are not allowed (#37). Stata's
+  // `by cluster' would silently lump missings into one implicit group.
+  qui count if mi(`cluster') & `touse' & `bwidth'
+  if r(N) > 0 {
+    di as error ///
+"`cluster' has " r(N) " missing values in the estimation sample; cluster ID must be non-missing."
+    exit 198
+  }
   qui levelsof `cluster' if `touse' & `bwidth', local(_clusters)
   local _N_clust : word count `_clusters'
   if `_N_clust' < 30 & "`wildcluster'" == "" {
@@ -784,6 +792,11 @@ program define _wsga_rdd_myboo, eclass
     tempvar _wsga_xb _wsga_resid
     qui predict double `_wsga_xb'    if `esample', xb
     qui predict double `_wsga_resid' if `esample', residuals
+    // Parse the cmdline once so the WCB loop can refit on a tempvar y_star
+    // instead of mutating the user's outcome variable in place (#37).
+    // Cmdline shape after `regress' is: "<cmd> <depvar> <rhs ...>".
+    gettoken _wsga_cmd_name _wsga_cmd_rest : _saved_cmdline
+    gettoken _wsga_olddep   _wsga_cmd_rhs  : _wsga_cmd_rest
   }
 
   // Start bootstrap
@@ -798,14 +811,14 @@ program define _wsga_rdd_myboo, eclass
     preserve
     if "`wildcluster'" != "" {
       // WCB-U: draw one Rademacher sign per cluster, broadcast to rows,
-      // y_star = xb + sign * resid; refit on y_star.
+      // y_star = xb + sign * resid; refit `<cmd> y_star <rhs>` (#37: never
+      // touch the user's outcome variable).
       tempvar _wsga_u _wsga_sign _wsga_ystar
       qui by `cluster', sort: gen double `_wsga_u' = runiform() if _n == 1
       qui by `cluster': replace `_wsga_u' = `_wsga_u'[1]
       qui gen double `_wsga_sign'  = cond(`_wsga_u' < 0.5, -1, 1) if `esample'
       qui gen double `_wsga_ystar' = `_wsga_xb' + `_wsga_sign' * `_wsga_resid' if `esample'
-      qui replace `_saved_depvar' = `_wsga_ystar' if `esample'
-      qui `_saved_cmdline'
+      qui `_wsga_cmd_name' `_wsga_ystar' `_wsga_cmd_rhs'
       // Skip PS refit block below; jump to coefficient extraction
     }
     else {

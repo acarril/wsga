@@ -123,6 +123,37 @@ else {
 }
 restore
 
+// -- TEST 9: WCB does not mutate the user's outcome variable (#37) --
+preserve
+tempvar _Y_snapshot
+gen double `_Y_snapshot' = Y
+qui wsga rdd Y, sgroup(G) running(X) bwidth(10) reducedform ///
+  bsreps(20) seed(7) noipsw cluster(clust) wildcluster
+qui count if !mi(Y) & !mi(`_Y_snapshot') & abs(Y - `_Y_snapshot') > 1e-12
+if r(N) == 0 {
+  di as result "PASS [WCB does not mutate Y in dataset]"
+}
+else {
+  di as error "FAIL [WCB mutated " r(N) " rows of Y]"
+  local ++n_fail
+}
+restore
+
+// -- TEST 10: missing cluster IDs rejected (#37) --
+preserve
+gen clust_with_mi = clust
+qui replace clust_with_mi = . in 1/100
+capture wsga rdd Y, sgroup(G) running(X) bwidth(10) reducedform ///
+  bsreps(20) seed(1) noipsw cluster(clust_with_mi)
+if _rc != 0 {
+  di as result "PASS [missing-cluster rejected, rc=" _rc "]"
+}
+else {
+  di as error "FAIL [missing cluster IDs should have errored]"
+  local ++n_fail
+}
+restore
+
 if `n_fail' == 0 {
   di as result _newline "All wsga rdd wildcluster smoke tests passed."
 }
