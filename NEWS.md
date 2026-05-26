@@ -1,5 +1,47 @@
 # wsga (R package) NEWS
 
+## wsga 1.2.0 (2026-05-26)
+
+### New features
+
+- **Stata**: `wsga rdd` gains two new bootstrap options matching `wsga did`:
+  - `cluster(varname)` -- pairs-cluster bootstrap. Whole clusters are
+    resampled with replacement (`bsample, cluster()`). Composes cleanly
+    with `blockbootstrap()` for stratified cluster resampling. No silent
+    default: clustering must be specified explicitly.
+  - `wildcluster` -- unrestricted wild cluster bootstrap (WCB-U) with
+    Rademacher signs at the cluster level. Conditions on the data, sign-flips
+    the residuals from the main fit, refits on `y_star = xb + sign * resid`.
+    Recommended at small G (<~30 clusters), where pairs over-rejects under
+    H0 (Cameron, Gelbach & Miller 2008). Requires `cluster()`. Not supported
+    with `ivregress` (fuzzy RD via 2SLS); WCB on a 2SLS fit needs a different
+    recipe (#30).
+- **Stata**: `wsga rdd` now emits a G<30 advisory when `cluster()` is set
+  and there are fewer than 30 unique clusters, recommending `wildcluster`.
+  Mirrors the existing DiD advisory.
+- **Stata**: `wsga rdd` posts new e-class results: `e(B_ok)` (successful
+  bootstrap reps), `e(N_clust)` (cluster count, when `cluster()` set),
+  `e(boot_type)` (`pairs` or `wild`), `e(clustvar)` (clustering variable
+  name).
+- **Stata**: `wsga rdd` display label now distinguishes
+  `Bootstrap replications` / `Cluster bootstrap` / `Wild cluster bootstrap`
+  to match what was actually run.
+
+### Documentation
+
+- `wsga_rdd.sthlp` gains a "Stored results" section mirroring
+  `wsga_did.sthlp`, plus examples for `cluster()` and `wildcluster`.
+
+### Internal
+
+- New `stata/tests/smoke_rdd_wild.do`: 8 checks covering pairs-cluster
+  bookkeeping, wildcluster runs and bookkeeping, pairs no-cluster
+  unchanged, validation errors (wildcluster+nobootstrap,
+  wildcluster-without-cluster, wildcluster+ivregress), seed reproducibility,
+  and the G<30 advisory path.
+
+---
+
 ## wsga 1.1.0 (2026-05-25)
 
 ### Breaking changes
