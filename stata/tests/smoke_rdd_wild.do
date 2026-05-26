@@ -1,4 +1,4 @@
-// smoke_rdd_wild.do -- tests for `wsga rdd, cluster() wildcluster`
+// smoke_rdd_wild.do -- tests for `wsga rdd, cluster() wildcluster / wcbrestricted`
 // Run from rddsga-repo/:
 //   stata-mp -b do stata/tests/smoke_rdd_wild.do && cat smoke_rdd_wild.log
 
@@ -109,7 +109,7 @@ else {
   local ++n_fail
 }
 
-// -- TEST 8: G<30 advisory fires for pairs but not for wild (just runs without error) --
+// -- TEST 8: G<30 advisory fires for pairs but not for wild --
 preserve
 gen clust_small = ceil(_n/1000)
 qui wsga rdd Y, sgroup(G) running(X) bwidth(10) reducedform ///
@@ -153,14 +153,6 @@ else {
   local ++n_fail
 }
 restore
-
-if `n_fail' == 0 {
-  di as result _newline "All wsga rdd wildcluster smoke tests passed."
-}
-else {
-  di as error _newline "`n_fail' smoke test(s) FAILED."
-  exit 1
-}
 
 // -- TEST 11: wcbrestricted runs and posts boot_type=wild_restricted --
 capture wsga rdd Y, sgroup(G) running(X) bwidth(10) reducedform ///
@@ -231,6 +223,7 @@ else {
   local ++n_fail
 }
 
+// -- Final result --
 if `n_fail' == 0 {
   di as result _newline "All wsga rdd wildcluster smoke tests passed."
 }
