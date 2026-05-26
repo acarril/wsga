@@ -73,18 +73,35 @@ dgp_rdd <- function(n, delta, beta_M, beta_G = TRUE_DIFF) {
 }
 
 # K-moderator variant for Scenario 3 (power vs K).
-# M_k are binary, imbalanced across G: P(M_k=1|G=1)=0.7, P(M_k=1|G=0)=0.3.
-# M_k have NO direct effect on y -- they only predict G membership.
-# Full saturation (M as outcome covariates) then adds 2K df with no variance
-# reduction benefit, so power declines with K.  WSGA absorbs M in the
-# propensity score (K logit params, 0 outcome df) so power holds up.
-dgp_rdd_multi <- function(n, K, beta_G = S3_DIFF) {
+#
+# Each M_k ~ N(delta_k * G, 1) with delta_k = 0.4 (continuous, moderate
+# imbalance).  M_k has NO direct effect on y -- it only predicts G.
+# Continuous moderators avoid the extreme propensity scores produced by
+# many imbalanced binary moderators (which create large IPW weight variance
+# and would artificially suppress WSGA's power regardless of K).
+#
+# Three comparators:
+#   naive      -- y ~ 1 | G, noipsw=TRUE  (no adjustment; unbiased here
+#                  since M has no direct y-effect, but loses power with K
+#                  because it can't tell wsga_rdd there are no confounders)
+#   wsga       -- y ~ 1 | G, balance ~ M1+...+MK  (IPW; lean outcome)
+#   full_sat   -- y ~ M1+...+MK | G, noipsw=TRUE  (linear covariates; adds
+#                  2K df to the outcome; a proxy for a covariate-adjustment
+#                  approach that is NOT the Calonico et al. cell-splitting
+#                  which would require 2^K interaction terms and collapses
+#                  even faster -- cell-splitting is infeasible to implement
+#                  in wsga_rdd's formula interface)
+#
+# Expected story: wsga power stays close to naive (outcome stays lean);
+# full_sat declines slowly from 2K df overhead; both far better than
+# the theoretical cell-splitting curve (2^K parameters, not shown).
+dgp_rdd_multi <- function(n, K, beta_G = S3_DIFF, delta_m = 0.4) {
   x   <- runif(n, -1, 1)
   G   <- rbinom(n, 1, 0.5)
   Z   <- as.integer(x >= 0)
   mdf <- as.data.frame(
     sapply(seq_len(max(K, 1L)), function(k)
-      rbinom(n, 1, ifelse(G == 1, 0.7, 0.3))))
+      rnorm(n, mean = delta_m * G, sd = 1)))
   colnames(mdf) <- paste0("M", seq_len(max(K, 1L)))
   y <- 2*Z*(1-G) + (2 + beta_G)*Z*G +
        0.3*x*(1-G) + 0.5*x*G + rnorm(n, sd = 0.5)
@@ -138,11 +155,17 @@ one_rep_boot <- function(n, delta, beta_M, beta_G = TRUE_DIFF, bsreps = BSREPS) 
 }
 
 # S3: power vs K moderators (uses S3_DIFF = 0.5, a smaller effect so the
-# power curves separate -- at TRUE_DIFF = 2 both methods hit 100% power)
+# power curves separate -- at TRUE_DIFF = 2 all methods hit 100% power)
 one_rep_multi <- function(n, K, beta_G = S3_DIFF) {
   d <- dgp_rdd_multi(n, K, beta_G)
 
-  # WSGA: y ~ 1 | G, balance on all K moderators
+  # Naive: no adjustment at all (y ~ 1 | G, noipsw=TRUE); unbiased here
+  # since M has no direct y-effect, but included for baseline comparison
+  f_naive <- tryCatch(hush(wsga_rdd(
+    y ~ 1 | G, data = d, running = ~ x, bwidth = BW,
+    noipsw = TRUE, bootstrap = FALSE)), error = function(e) NULL)
+
+  # WSGA: lean outcome regression (y ~ 1 | G), all K in propensity score
   bal <- if (K > 0)
     as.formula(paste("~", paste0("M", seq_len(K), collapse = "+")))
   else NULL
@@ -150,16 +173,17 @@ one_rep_multi <- function(n, K, beta_G = S3_DIFF) {
     y ~ 1 | G, data = d, running = ~ x, bwidth = BW,
     balance = bal, noipsw = (K == 0), bootstrap = FALSE)), error = function(e) NULL)
 
-  # Full saturation: all K as outcome covariates, no IPW
+  # Full saturation: all K as linear outcome covariates, no IPW (adds 2K df)
   rhs    <- if (K > 0) paste0("M", seq_len(K), collapse = "+") else "1"
   f_full <- tryCatch(hush(wsga_rdd(
     as.formula(paste("y ~", rhs, "| G")),
     data = d, running = ~ x, bwidth = BW,
     noipsw = TRUE, bootstrap = FALSE)), error = function(e) NULL)
 
-  if (is.null(f_wsga) || is.null(f_full)) return(NULL)
-  c(wsga_pval = f_wsga$pval$diff,
-    full_pval = f_full$pval$diff)
+  if (is.null(f_naive) || is.null(f_wsga) || is.null(f_full)) return(NULL)
+  c(naive_pval = f_naive$pval$diff,
+    wsga_pval  = f_wsga$pval$diff,
+    full_pval  = f_full$pval$diff)
 }
 
 # S4: sensitivity to unobservable confounding.
@@ -305,8 +329,9 @@ s3 <- do.call(rbind, lapply(split(reps3, interaction(reps3$n, reps3$K)), functio
   data.frame(
     n = x$n[1], K = x$K[1],
     n_ok        = nrow(x),
-    power_wsga  = mean(x$wsga_pval < 0.05, na.rm = TRUE),
-    power_full  = mean(x$full_pval < 0.05, na.rm = TRUE)
+    power_naive = mean(x$naive_pval < 0.05, na.rm = TRUE),
+    power_wsga  = mean(x$wsga_pval  < 0.05, na.rm = TRUE),
+    power_full  = mean(x$full_pval  < 0.05, na.rm = TRUE)
   )
 }))
 write.csv(s3, file.path(OUTDIR, "s3_power_vs_K.csv"), row.names = FALSE)
