@@ -130,7 +130,8 @@ head(fit_boot$bootstrap$draws)
 | `m` | IPW mode: `2` = balance both groups (default), `1` = ATT G=1, `0` = ATT G=0 |
 | `comsup` | Restrict to common propensity score support |
 | `rbalance` | Balance table means: `0` = at cutoff (default), `1` = in sample |
-| `boot_type` | `"pairs"` (default), `"wild"` (WCB-U, recommended for G < ~30), or `"wild_restricted"` (WCB-R, recommended for G < ~12). WCB-R uses restricted residuals to form the bootstrap outcome, yielding better size control at very small cluster counts. P-values use a non-recentered formula; CIs remain empirical percentile from unrestricted draws. See MacKinnon and Webb (2017, 2018). |
+| `cluster_var` | Column name defining clusters for the bootstrap. When set, the pairs bootstrap resamples whole clusters (Cameron-Gelbach-Miller); required for `boot_type = "wild"` or `"wild_restricted"`. Default `NULL` (row-level bootstrap). |
+| `boot_type` | `"pairs"` (default), `"wild"` (WCB-U, recommended for G < ~30), or `"wild_restricted"` (WCB-R, recommended for G < ~12). WCB-R uses restricted residuals to form the bootstrap outcome, yielding better size control at very small cluster counts. P-values use a non-recentered formula; CIs remain empirical percentile from unrestricted draws. See MacKinnon and Webb (2017, 2018). Requires `cluster_var`. |
 | `inference` | `"empirical"` (default with bootstrap), `"normal"` (bootstrap SE + normal-approx CI), or `"analytical"` (default without bootstrap, sandwich/cluster-robust SE) |
 | `block_var` | Column name for stratified block bootstrap. Ignored with `boot_type = "wild"` or `"wild_restricted"`. |
 | `vce` | Sandwich SE type: `"HC1"` (default), `"HC0"`, `"HC2"`, `"HC3"`, `"cluster"` |

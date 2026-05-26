@@ -157,7 +157,7 @@ under H0 is the binding concern at small G.{p_end}
 {synopt:{cmd:e(cmd)}}{cmd:wsga}{p_end}
 {synopt:{cmd:e(subcmd)}}{cmd:did}{p_end}
 {synopt:{cmd:e(depvar)}}name of dependent variable{p_end}
-{synopt:{cmd:e(boot_type)}}(bootstrap) {cmd:pairs} or {cmd:wild}{p_end}
+{synopt:{cmd:e(boot_type)}}(bootstrap) {cmd:pairs}, {cmd:wild}, or {cmd:wild_restricted}{p_end}
 
 {p2col 5 23 26 2: Matrices}{p_end}
 {synopt:{cmd:e(b)}}1{cmd:x}2 coefficient vector with columns named {cmd:G0_Z} and {cmd:G1_Z}{p_end}

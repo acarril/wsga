@@ -34,6 +34,8 @@
 {syntab:IPW}
 {synopt:{opt balance(varlist)}}moderators for propensity score; defaults to covariates{p_end}
 {synopt:{opt noipsw}}skip IPW reweighting{p_end}
+{synopt:{opt ipsweight(newvar)}}save IPW weights to {it:newvar} in the dataset{p_end}
+{synopt:{opt pscore(newvar)}}save propensity score to {it:newvar} in the dataset{p_end}
 {synopt:{opt m(#)}}weighting mode: 2 = both groups (default), 1 = G1->G0, 0 = G0->G1{p_end}
 {synopt:{opt probit}}use probit instead of logit for propensity score{p_end}
 {synopt:{opt comsup}}restrict to common propensity score support{p_end}
