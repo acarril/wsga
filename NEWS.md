@@ -1,5 +1,30 @@
 # wsga (R package) NEWS
 
+## wsga 1.2.2 (2026-05-26)
+
+### Bug fixes
+
+- **Stata** (`wsga rdd`, WCB path): the bootstrap loop no longer mutates
+  the user's outcome variable in place. Previously `_wsga_rdd_myboo` did
+  `replace <depvar> = <ystar>` inside `preserve/restore`, which was correct
+  in the happy path but left the outcome corrupted in memory if a replicate
+  errored between `replace` and `restore`. WCB now parses the cmdline once
+  via `gettoken` and refits as `<cmd> <ystar_tempvar> <rhs>` per replicate,
+  never touching the dataset's copy of the outcome (#37).
+- **Stata** (`wsga rdd`): missing cluster IDs in the estimation sample now
+  error out (`exit 198`) instead of being silently lumped into one implicit
+  group by `by cluster`. Matches R behavior. DiD is unaffected because
+  `markout touse unit time treat sgroup` already drops missing-unit rows
+  (#37).
+
+### Internal
+
+- New regression tests in `stata/tests/smoke_rdd_wild.do` (2 added, 10 total):
+  (a) `Y` is byte-for-byte unchanged after a WCB run, (b) missing cluster
+  IDs cause `wsga rdd` to error with `rc != 0`.
+
+---
+
 ## wsga 1.2.1 (2026-05-26)
 
 ### Documentation
