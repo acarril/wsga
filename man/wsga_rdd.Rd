@@ -97,13 +97,23 @@ per replicate)? Default \code{TRUE}.}
 
 \item{bsreps}{Positive integer: number of bootstrap replications. Default \code{200}.}
 
-\item{boot_type}{Character. Bootstrap resampling scheme: \code{"pairs"} (default)
-or \code{"wild"}. \code{"wild"} runs an unrestricted wild cluster bootstrap with
-Rademacher signs and is recommended when the number of clusters is small
-(G < ~30); requires \code{cluster_var} to be set and is not supported with
-\code{model = "iv"}. WCB conditions on the data and does not re-estimate the
-propensity score, so it trades some IPW-uncertainty coverage for better
-size control under H0.}
+\item{boot_type}{Character. Bootstrap resampling scheme:
+\itemize{
+\item \code{"pairs"} (default): pairs cluster bootstrap; re-estimates the
+propensity score per replicate, propagating IPW uncertainty.
+\item \code{"wild"}: unrestricted wild cluster bootstrap (WCB-U) with Rademacher
+signs. Recommended when G < ~30. Conditions on the data and does not
+re-estimate the propensity score.
+\item \code{"wild_restricted"}: restricted wild cluster bootstrap (WCB-R). For
+each null hypothesis, y* is formed from residuals of the model fit
+under H0; the unrestricted model is then refit on y* to obtain the
+test statistic. P-values use \code{(1 + count) / (B+1)} with no
+recentering; CIs remain empirical percentile from unrestricted draws.
+Recommended when G < ~12 for better size control (MacKinnon and Webb
+2017, 2018).
+Both wild variants require \code{cluster_var} and are not supported with
+\code{model = "iv"}.
+}}
 
 \item{inference}{Character. How standard errors, CIs, and p-values are
 computed and reported. One of:
@@ -123,7 +133,7 @@ resampling. Default \code{NULL} (unstratified). Semantics adapt to
 \code{cluster_var}: when \code{cluster_var} is \code{NULL}, \code{block_var} defines strata
 of rows; when \code{cluster_var} is set, it defines strata of clusters and
 must be constant within each cluster (validated at runtime). Ignored
-when \code{boot_type = "wild"}.}
+when \code{boot_type} is \code{"wild"} or \code{"wild_restricted"}.}
 
 \item{fixed_fs}{Logical. Fixed first-stage bootstrap for IV: bootstrap the
 reduced form and divide by the point-estimate first-stage coefficients.

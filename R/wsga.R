@@ -49,13 +49,21 @@ NULL
 #' @param bootstrap Logical. Run the bootstrap loop (refits the full pipeline
 #'   per replicate)? Default `TRUE`.
 #' @param bsreps Positive integer: number of bootstrap replications. Default `200`.
-#' @param boot_type Character. Bootstrap resampling scheme: `"pairs"` (default)
-#'   or `"wild"`. `"wild"` runs an unrestricted wild cluster bootstrap with
-#'   Rademacher signs and is recommended when the number of clusters is small
-#'   (G < ~30); requires `cluster_var` to be set and is not supported with
-#'   `model = "iv"`. WCB conditions on the data and does not re-estimate the
-#'   propensity score, so it trades some IPW-uncertainty coverage for better
-#'   size control under H0.
+#' @param boot_type Character. Bootstrap resampling scheme:
+#'   - `"pairs"` (default): pairs cluster bootstrap; re-estimates the
+#'     propensity score per replicate, propagating IPW uncertainty.
+#'   - `"wild"`: unrestricted wild cluster bootstrap (WCB-U) with Rademacher
+#'     signs. Recommended when G < ~30. Conditions on the data and does not
+#'     re-estimate the propensity score.
+#'   - `"wild_restricted"`: restricted wild cluster bootstrap (WCB-R). For
+#'     each null hypothesis, y* is formed from residuals of the model fit
+#'     under H0; the unrestricted model is then refit on y* to obtain the
+#'     test statistic. P-values use `(1 + count) / (B+1)` with no
+#'     recentering; CIs remain empirical percentile from unrestricted draws.
+#'     Recommended when G < ~12 for better size control (MacKinnon and Webb
+#'     2017, 2018).
+#'   Both wild variants require `cluster_var` and are not supported with
+#'   `model = "iv"`.
 #' @param inference Character. How standard errors, CIs, and p-values are
 #'   computed and reported. One of:
 #'   - `"empirical"`: bootstrap SE; empirical (percentile) CIs at 2.5/97.5;
@@ -71,7 +79,7 @@ NULL
 #'   `cluster_var`: when `cluster_var` is `NULL`, `block_var` defines strata
 #'   of rows; when `cluster_var` is set, it defines strata of clusters and
 #'   must be constant within each cluster (validated at runtime). Ignored
-#'   when `boot_type = "wild"`.
+#'   when `boot_type` is `"wild"` or `"wild_restricted"`.
 #' @param fixed_fs Logical. Fixed first-stage bootstrap for IV: bootstrap the
 #'   reduced form and divide by the point-estimate first-stage coefficients.
 #'   Default `FALSE`.
@@ -247,15 +255,14 @@ wsga_rdd <- function(formula,
 #'   Default `FALSE`.
 #' @param bootstrap Logical. Run the bootstrap loop? Default `TRUE`.
 #' @param bsreps Positive integer: number of bootstrap replications. Default `200`.
-#' @param boot_type Character. Bootstrap resampling scheme: `"pairs"` (default)
-#'   or `"wild"` (unrestricted wild cluster bootstrap with Rademacher signs).
-#'   `"wild"` is recommended when the number of clusters is small (G < ~30).
-#'   See [wsga_rdd()] for the IPW-uncertainty caveat.
+#' @param boot_type Character. Bootstrap resampling scheme: `"pairs"` (default),
+#'   `"wild"` (WCB-U; recommended for G < ~30), or `"wild_restricted"` (WCB-R;
+#'   recommended for G < ~12). See [wsga_rdd()] for full details.
 #' @param inference Character. One of `"empirical"` (default with bootstrap),
 #'   `"normal"`, or `"analytical"` (default without bootstrap).
 #' @param block_var Character or `NULL`. Column name for stratified bootstrap
 #'   resampling (strata of clusters when `cluster_var` is set). Default `NULL`.
-#'   Ignored when `boot_type = "wild"`.
+#'   Ignored when `boot_type` is `"wild"` or `"wild_restricted"`.
 #' @param fixed_ps Logical. Diagnostic flag; see [wsga_rdd()] for details.
 #'   Default `FALSE`.
 #' @param seed Integer or `NULL`. RNG seed for reproducibility. Default `NULL`.
