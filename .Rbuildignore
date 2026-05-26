@@ -3,3 +3,5 @@
 ^README\.md$
 ^stata$
 ^\.claude$
+^inst/run_simulations\.R$
+^inst/simulation_results$
