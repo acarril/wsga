@@ -1,0 +1,72 @@
+R/wsga.R
+  s_4b929bccf076dd::t_5f770e13ace1e7 462,464,466,468
+  s_4b929bccf076dd::t_1044328b7a9a1c 1059-1062
+  s_4b929bccf076dd::t_374759a98285ac 168
+  s_4b929bccf076dd::t_f1c94c78702bef 698-699,701,706-710,714,725-726
+  s_4b929bccf076dd::t_c2c8fe5d1d9a6e 302
+  s_4b929bccf076dd::t_bf0b95de039d27 58,64-65,96,115-116,375,415,473,492,510,520,528,564,569,634,693,803,852,944,950,1015
+  s_4b929bccf076dd::t_c3917e25052527 365
+R/bootstrap.R
+  s_4b929bccf076dd::t_bcb43e89b6a469 27,42,57,94,108-109
+  s_4b929bccf076dd::t_08f08f74ae13a5 243-244,287,295-328,332-333,335-340,346-372,377,391,395-420
+stata/tests/smoke_rdd_wild.do
+  s_4b929bccf076dd::t_eeef941e71db63 164,166,168,170-172,174-175,177-179,181,183,185-186,188-190,192,194,196-197,199-201,203,205,207-208,210-212,214,216-219,221-224,226-227,229-240
+  s_4b929bccf076dd::t_bdea87743cf01d 165,167,169,173,176,180,182,184,187,191,193,195,198,202,204,206,209,213,215,220,225,228
+stata/wsga.sthlp
+  s_4b929bccf076dd::t_3a0232256bb12b 2
+stata/wsga.ado
+  s_4b929bccf076dd::t_c57ce71519741d 63,65-66,68,70-71,73,75-76,78,80-81,83,85
+  s_4b929bccf076dd::t_c15c95469a34f4 405-406
+  s_4b929bccf076dd::t_98f327e7ad683a 1673,1679-1680,1686,1688-1720
+  s_4b929bccf076dd::t_b8fb130edd1cd5 829,831-868,874-875
+  s_4b929bccf076dd::t_6400a37456ee59 883,887-889,892-893,895-930
+  s_4b929bccf076dd::t_93754b6c921600 1
+  s_4b929bccf076dd::t_cc6eb920fe206c 1392,1394-1395,1397,1399-1400,1406
+  s_4b929bccf076dd::t_045de48354f2a7 1844-1856
+  s_4b929bccf076dd::t_894acf82ee37cc 1908-1909
+  s_4b929bccf076dd::t_b3eb3ee56c3da3 386
+  s_4b929bccf076dd::t_cdb08df97f9879 1606-1607,1609,1612,1616,1618-1650,1660-1663
+  s_4b929bccf076dd::t_ea6f7e0295e4cf 2009
+  s_4b929bccf076dd::t_c35588a9764db8 31,62,64,67,69,72,74,77,79,82,84,387,401,407-408,786,820,830,873,882,894,1047,1050,1378,1385,1391,1393,1396,1398,1405,1407-1408,1602,1608,1611,1617,1659,1672,1687,1843,1907,2008
+  s_4b929bccf076dd::t_a1621927c0fa0f 1048-1049,1051-1069,1071-1072,1074-1075
+stata/wsga_did.sthlp
+  s_4b929bccf076dd::t_ebd575603fc7b3 2
+tests/testthat/test-wild-bootstrap-restricted.R
+  s_4b929bccf076dd::t_6fdd84d84e165d 1-33,35-82,84-95,97-134,136-165
+DESCRIPTION
+  s_4b929bccf076dd::t_772d43b1c71311 3
+stata/rddsga.sthlp
+  s_4b929bccf076dd::t_5e96d1e40c5bd6 2
+stata/rddsga.pkg
+  s_4b929bccf076dd::t_73af4d9619c51b 1
+NEWS.md
+  s_4b929bccf076dd::t_735685f81a827b 3-21
+stata/wsga.pkg
+  s_4b929bccf076dd::t_4dcb05dbde825e 1
+stata/rddsga.ado
+  s_4b929bccf076dd::t_f4a2ac7cb6c526 1
+stata/stata.toc
+  s_4b929bccf076dd::t_d34feebd97046a 1
+stata/tests/smoke_did_wild.do
+  s_4b929bccf076dd::t_b8836e0fdfec4f 113,128,132,145,156
+  s_4b929bccf076dd::t_2c78ea09ce9cec 1,10,26,37,48,67,78
+  s_4b929bccf076dd::t_bf3ade0357054b 108-112,114-127,129-131,133-144,146-155,157-172
+stata/wsga_rdd.sthlp
+  s_4b929bccf076dd::t_01ffe8fa79e485 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "39efc8940d8e3bfbf03e4b0018d1aceef1120a6c",
+  "prompts": {},
+  "sessions": {
+    "s_4b929bccf076dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6947628-cd33-4583-be86-f617be7d520c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
