@@ -23,7 +23,7 @@ wsga_rdd(
   rbalance = 0L,
   bootstrap = TRUE,
   bsreps = 200L,
-  boot_type = c("pairs", "wild"),
+  boot_type = c("pairs", "wild", "wild_restricted"),
   inference = NULL,
   block_var = NULL,
   fixed_fs = FALSE,
@@ -103,7 +103,7 @@ Rademacher signs and is recommended when the number of clusters is small
 (G < ~30); requires \code{cluster_var} to be set and is not supported with
 \code{model = "iv"}. WCB conditions on the data and does not re-estimate the
 propensity score, so it trades some IPW-uncertainty coverage for better
-size control under H₀.}
+size control under H0.}
 
 \item{inference}{Character. How standard errors, CIs, and p-values are
 computed and reported. One of:
@@ -111,8 +111,8 @@ computed and reported. One of:
 \item \code{"empirical"}: bootstrap SE; empirical (percentile) CIs at 2.5/97.5;
 \code{(1 + count)/(B + 1)} p-values. Requires \code{bootstrap = TRUE}. \strong{Default
 when \code{bootstrap = TRUE}.}
-\item \code{"normal"}: bootstrap SE; normal-approximation CIs \verb{b ± z·SE} and
-p-values \verb{2·(1 − Φ(|t|))}. Requires \code{bootstrap = TRUE}.
+\item \code{"normal"}: bootstrap SE; normal-approximation CIs \verb{b +/- z*SE} and
+p-values \verb{2*(1 - Phi(|t|))}. Requires \code{bootstrap = TRUE}.
 \item \code{"analytical"}: sandwich (or cluster-robust) SE; CIs and p-values from
 the t distribution with the regression residual df. Requires
 \code{bootstrap = FALSE}. \strong{Default when \code{bootstrap = FALSE}.}
@@ -150,7 +150,7 @@ outcome specification when the PS fit is expensive. No effect when
 Drives two things: when \code{bootstrap = TRUE}, switches the bootstrap from
 row-level to pairs cluster (whole clusters are resampled with
 replacement; cluster IDs are made unique per draw so unit fixed effects
-remain identified — the Cameron–Gelbach–Miller recipe). When
+remain identified -- the Cameron-Gelbach-Miller recipe). When
 \code{inference = "analytical"}, also requires \code{vce = "cluster"} to deliver
 the cluster-robust sandwich SE. With fewer than ~30 unique clusters, a
 one-time warning is emitted about likely SE understatement; see
@@ -171,8 +171,8 @@ An S3 object of class \code{"wsga"} with the following elements:
 \code{inference}.}
 \item{\code{ci}}{Named list of 95\% confidence intervals, computed according to
 \code{inference}.}
-\item{\code{vcov}}{2×2 variance-covariance matrix for (g0, g1).}
-\item{\code{bootstrap}}{List with \code{draws} (B×3 matrix), \code{vcov}, \code{pval}, \code{ci},
+\item{\code{vcov}}{2x2 variance-covariance matrix for (g0, g1).}
+\item{\code{bootstrap}}{List with \code{draws} (Bx3 matrix), \code{vcov}, \code{pval}, \code{ci},
 \code{B_ok} (surviving reps), \code{failed} (dropped reps). \code{NULL} if
 \code{bootstrap = FALSE}.}
 \item{\code{inference}}{Character: the inference mode in effect.}

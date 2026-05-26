@@ -19,7 +19,7 @@ wsga_did(
   show_balance = FALSE,
   bootstrap = TRUE,
   bsreps = 200L,
-  boot_type = c("pairs", "wild"),
+  boot_type = c("pairs", "wild", "wild_restricted"),
   inference = NULL,
   block_var = NULL,
   fixed_ps = FALSE,
