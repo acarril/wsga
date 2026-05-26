@@ -1,5 +1,24 @@
 # wsga (R package) NEWS
 
+## wsga 1.3.0 (2026-05-26)
+
+### New features
+
+- **R + Stata**: add restricted wild cluster bootstrap (WCB-R) for better
+  size control at very small cluster counts (G < ~12), following MacKinnon
+  and Webb (2017, 2018). In R: `boot_type = "wild_restricted"`; in Stata:
+  `wcbrestricted` option on both `wsga rdd` and `wsga did`.
+- **Architecture**: WCB-R uses a combined loop -- unrestricted draws for
+  empirical percentile CIs (per coauthor agreement) and three restricted
+  draws (H0: G0=0, H0: G1=0, H0: G0=G1) for p-values. P-value formula
+  for restricted draws does not recenter (`|draw| >= |est|`), matching
+  MacKinnon-Webb eq. 8.
+- **Advisories updated**: G < 30 with `pairs` recommends `boot_type =
+  "wild"` (unchanged); G < 12 with `boot_type = "wild"` now recommends
+  `boot_type = "wild_restricted"` (#36).
+
+---
+
 ## wsga 1.2.2 (2026-05-26)
 
 ### Bug fixes

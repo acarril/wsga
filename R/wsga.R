@@ -49,20 +49,28 @@ NULL
 #' @param bootstrap Logical. Run the bootstrap loop (refits the full pipeline
 #'   per replicate)? Default `TRUE`.
 #' @param bsreps Positive integer: number of bootstrap replications. Default `200`.
-#' @param boot_type Character. Bootstrap resampling scheme: `"pairs"` (default)
-#'   or `"wild"`. `"wild"` runs an unrestricted wild cluster bootstrap with
-#'   Rademacher signs and is recommended when the number of clusters is small
-#'   (G < ~30); requires `cluster_var` to be set and is not supported with
-#'   `model = "iv"`. WCB conditions on the data and does not re-estimate the
-#'   propensity score, so it trades some IPW-uncertainty coverage for better
-#'   size control under H₀.
+#' @param boot_type Character. Bootstrap resampling scheme:
+#'   - `"pairs"` (default): pairs cluster bootstrap; re-estimates the
+#'     propensity score per replicate, propagating IPW uncertainty.
+#'   - `"wild"`: unrestricted wild cluster bootstrap (WCB-U) with Rademacher
+#'     signs. Recommended when G < ~30. Conditions on the data and does not
+#'     re-estimate the propensity score.
+#'   - `"wild_restricted"`: restricted wild cluster bootstrap (WCB-R). For
+#'     each null hypothesis, y* is formed from residuals of the model fit
+#'     under H0; the unrestricted model is then refit on y* to obtain the
+#'     test statistic. P-values use `(1 + count) / (B+1)` with no
+#'     recentering; CIs remain empirical percentile from unrestricted draws.
+#'     Recommended when G < ~12 for better size control (MacKinnon and Webb
+#'     2017, 2018).
+#'   Both wild variants require `cluster_var` and are not supported with
+#'   `model = "iv"`.
 #' @param inference Character. How standard errors, CIs, and p-values are
 #'   computed and reported. One of:
 #'   - `"empirical"`: bootstrap SE; empirical (percentile) CIs at 2.5/97.5;
 #'     `(1 + count)/(B + 1)` p-values. Requires `bootstrap = TRUE`. **Default
 #'     when `bootstrap = TRUE`.**
-#'   - `"normal"`: bootstrap SE; normal-approximation CIs `b ± z·SE` and
-#'     p-values `2·(1 − Φ(|t|))`. Requires `bootstrap = TRUE`.
+#'   - `"normal"`: bootstrap SE; normal-approximation CIs `b +/- z*SE` and
+#'     p-values `2*(1 - Phi(|t|))`. Requires `bootstrap = TRUE`.
 #'   - `"analytical"`: sandwich (or cluster-robust) SE; CIs and p-values from
 #'     the t distribution with the regression residual df. Requires
 #'     `bootstrap = FALSE`. **Default when `bootstrap = FALSE`.**
@@ -71,7 +79,7 @@ NULL
 #'   `cluster_var`: when `cluster_var` is `NULL`, `block_var` defines strata
 #'   of rows; when `cluster_var` is set, it defines strata of clusters and
 #'   must be constant within each cluster (validated at runtime). Ignored
-#'   when `boot_type = "wild"`.
+#'   when `boot_type` is `"wild"` or `"wild_restricted"`.
 #' @param fixed_fs Logical. Fixed first-stage bootstrap for IV: bootstrap the
 #'   reduced form and divide by the point-estimate first-stage coefficients.
 #'   Default `FALSE`.
@@ -93,7 +101,7 @@ NULL
 #'   Drives two things: when `bootstrap = TRUE`, switches the bootstrap from
 #'   row-level to pairs cluster (whole clusters are resampled with
 #'   replacement; cluster IDs are made unique per draw so unit fixed effects
-#'   remain identified — the Cameron–Gelbach–Miller recipe). When
+#'   remain identified -- the Cameron-Gelbach-Miller recipe). When
 #'   `inference = "analytical"`, also requires `vce = "cluster"` to deliver
 #'   the cluster-robust sandwich SE. With fewer than ~30 unique clusters, a
 #'   one-time warning is emitted about likely SE understatement; see
@@ -112,8 +120,8 @@ NULL
 #'     `inference`.}
 #'   \item{`ci`}{Named list of 95% confidence intervals, computed according to
 #'     `inference`.}
-#'   \item{`vcov`}{2×2 variance-covariance matrix for (g0, g1).}
-#'   \item{`bootstrap`}{List with `draws` (B×3 matrix), `vcov`, `pval`, `ci`,
+#'   \item{`vcov`}{2x2 variance-covariance matrix for (g0, g1).}
+#'   \item{`bootstrap`}{List with `draws` (Bx3 matrix), `vcov`, `pval`, `ci`,
 #'     `B_ok` (surviving reps), `failed` (dropped reps). `NULL` if
 #'     `bootstrap = FALSE`.}
 #'   \item{`inference`}{Character: the inference mode in effect.}
@@ -165,7 +173,7 @@ wsga_rdd <- function(formula,
                      rbalance     = 0L,
                      bootstrap    = TRUE,
                      bsreps       = 200L,
-                     boot_type    = c("pairs", "wild"),
+                     boot_type    = c("pairs", "wild", "wild_restricted"),
                      inference    = NULL,
                      block_var    = NULL,
                      fixed_fs     = FALSE,
@@ -247,15 +255,14 @@ wsga_rdd <- function(formula,
 #'   Default `FALSE`.
 #' @param bootstrap Logical. Run the bootstrap loop? Default `TRUE`.
 #' @param bsreps Positive integer: number of bootstrap replications. Default `200`.
-#' @param boot_type Character. Bootstrap resampling scheme: `"pairs"` (default)
-#'   or `"wild"` (unrestricted wild cluster bootstrap with Rademacher signs).
-#'   `"wild"` is recommended when the number of clusters is small (G < ~30).
-#'   See [wsga_rdd()] for the IPW-uncertainty caveat.
+#' @param boot_type Character. Bootstrap resampling scheme: `"pairs"` (default),
+#'   `"wild"` (WCB-U; recommended for G < ~30), or `"wild_restricted"` (WCB-R;
+#'   recommended for G < ~12). See [wsga_rdd()] for full details.
 #' @param inference Character. One of `"empirical"` (default with bootstrap),
 #'   `"normal"`, or `"analytical"` (default without bootstrap).
 #' @param block_var Character or `NULL`. Column name for stratified bootstrap
 #'   resampling (strata of clusters when `cluster_var` is set). Default `NULL`.
-#'   Ignored when `boot_type = "wild"`.
+#'   Ignored when `boot_type` is `"wild"` or `"wild_restricted"`.
 #' @param fixed_ps Logical. Diagnostic flag; see [wsga_rdd()] for details.
 #'   Default `FALSE`.
 #' @param seed Integer or `NULL`. RNG seed for reproducibility. Default `NULL`.
@@ -299,7 +306,7 @@ wsga_did <- function(formula,
                      show_balance = FALSE,
                      bootstrap    = TRUE,
                      bsreps       = 200L,
-                     boot_type    = c("pairs", "wild"),
+                     boot_type    = c("pairs", "wild", "wild_restricted"),
                      inference    = NULL,
                      block_var    = NULL,
                      fixed_ps     = FALSE,
@@ -362,7 +369,7 @@ wsga_did <- function(formula,
                    rbalance    = 0L,
                    bootstrap   = TRUE,
                    bsreps      = 200L,
-                   boot_type   = c("pairs", "wild"),
+                   boot_type   = c("pairs", "wild", "wild_restricted"),
                    inference   = NULL,
                    block_var   = NULL,
                    fixed_fs    = FALSE,
@@ -372,7 +379,7 @@ wsga_did <- function(formula,
                    cluster_var = NULL,
                    weights     = NULL) {
 
-  # ── 1. Argument validation ──────────────────────────────────────────────────
+  # -- 1. Argument validation --------------------------------------------------
   design    <- match.arg(design)
   model     <- match.arg(model)
   kernel    <- match.arg(kernel)
@@ -412,7 +419,7 @@ wsga_did <- function(formula,
   if (!bootstrap && inference %in% c("empirical", "normal"))
     stop(sprintf("`inference = '%s'` requires `bootstrap = TRUE`.", inference))
 
-  # ── 2. Parse formula ────────────────────────────────────────────────────────
+  # -- 2. Parse formula --------------------------------------------------------
   fml <- Formula::Formula(formula)
   if (length(fml)[2] != 2)
     stop("`formula` must be two-part: outcome ~ covariates | subgroup")
@@ -459,18 +466,18 @@ wsga_did <- function(formula,
   # WCB conditions on the data and only sign-flips residuals at the cluster
   # level, so a cluster identifier is essential and the implementation is
   # restricted to lm-based estimators (no 2SLS yet).
-  if (identical(boot_type, "wild")) {
+  if (boot_type %in% c("wild", "wild_restricted")) {
     if (!bootstrap)
-      stop("`boot_type = \"wild\"` requires `bootstrap = TRUE` (the wild bootstrap is itself the bootstrap loop).")
+      stop(sprintf("`boot_type = \"%s\"` requires `bootstrap = TRUE` (the wild bootstrap is itself the bootstrap loop).", boot_type))
     if (is.null(cluster_var))
-      stop("`boot_type = \"wild\"` requires a clustering variable; set `cluster_var` (in DiD this defaults to `unit`).")
+      stop(sprintf("`boot_type = \"%s\"` requires a clustering variable; set `cluster_var` (in DiD this defaults to `unit`).", boot_type))
     if (model == "iv")
-      stop("`boot_type = \"wild\"` is not supported with `model = \"iv\"` (fuzzy RDD). Use `boot_type = \"pairs\"` or set `model` to `\"rf\"` / `\"fs\"`.")
+      stop(sprintf("`boot_type = \"%s\"` is not supported with `model = \"iv\"` (fuzzy RDD). Use `boot_type = \"pairs\"` or set `model` to `\"rf\"` / `\"fs\"`.", boot_type))
   }
 
   # For DiD with a cluster variable in play, the analytical SE should be
   # cluster-robust.  If the user left `vce` at its package default ("HC1")
-  # — i.e., didn't ask for something specific — switch it to "cluster" so
+  # -- i.e., didn't ask for something specific -- switch it to "cluster" so
   # `inference = "analytical"` doesn't silently report HC1 SEs that
   # under-estimate clustered variance.
   if (design == "did" && !is.null(cluster_var) && identical(vce, "HC1")) {
@@ -489,7 +496,7 @@ wsga_did <- function(formula,
     post_value <- did_val$post_value
   }
 
-  # ── 3. Extract vectors ───────────────────────────────────────────────────────
+  # -- 3. Extract vectors -------------------------------------------------------
   y <- data[[outcome_name]]
   G <- data[[sgroup_name]]
   if (!all(G %in% c(0, 1, NA)))
@@ -507,7 +514,7 @@ wsga_did <- function(formula,
     Z  <- D * post_vec   # serves as the "treatment indicator" for downstream
   }
 
-  # ── 4. Sample masks ─────────────────────────────────────────────────────────
+  # -- 4. Sample masks ---------------------------------------------------------
   if (design == "rdd") {
     touse     <- !is.na(y) & !is.na(x) & !is.na(G)
     within_bw <- abs(x) < bwidth
@@ -517,7 +524,7 @@ wsga_did <- function(formula,
     within_bw <- rep(TRUE, nrow(data))
   }
 
-  # ── 5. Kernel weights (RDD only; DiD uses unit weights of 1 × obs_wt) ───────
+  # -- 5. Kernel weights (RDD only; DiD uses unit weights of 1 x obs_wt) -------
   if (design == "rdd") {
     kwt <- kernel_weights(x, bwidth, kernel, obs_weights)
   } else {
@@ -525,7 +532,7 @@ wsga_did <- function(formula,
            else as.numeric(obs_weights)
   }
 
-  # ── 6. Propensity score + IPW ────────────────────────────────────────────────
+  # -- 6. Propensity score + IPW ------------------------------------------------
   if (!noipsw && length(balance_names) > 0) {
     bal_mat <- data[, balance_names, drop = FALSE]
 
@@ -561,12 +568,12 @@ wsga_did <- function(formula,
   N_G0_unw <- sum(touse & within_bw & G == 0)
   N_G1_unw <- sum(touse & within_bw & G == 1)
 
-  # ── 7. Balance tables ────────────────────────────────────────────────────────
+  # -- 7. Balance tables --------------------------------------------------------
   balance_result <- NULL
   if (length(balance_names) > 0) {
     # Helper: one balance-table computation for a given touse mask.
     one_balance <- function(touse_mask, N_G0, N_G1, weighted_only = FALSE) {
-      # Effective rbalance — for DiD, only "mean in sample" makes sense
+      # Effective rbalance -- for DiD, only "mean in sample" makes sense
       # (no cutoff to extrapolate to).
       rb <- if (design == "rdd") rbalance else 1L
       unw_w <- replace(kwt * coerce_obs_wt(obs_weights, nrow(data)),
@@ -631,7 +638,7 @@ wsga_did <- function(formula,
     )
   }
 
-  # ── 8. Design matrix + estimation ────────────────────────────────────────────
+  # -- 8. Design matrix + estimation --------------------------------------------
   # For model = "fs" (RDD only), outcome is the fuzzy treatment variable
   outcome_for_model <- if (model == "fs") fuzzy_name else outcome_name
 
@@ -690,24 +697,28 @@ wsga_did <- function(formula,
                            df_resid   = if (model != "iv") model_result$fit$df.residual else NULL,
                            use_normal = FALSE)
 
-  # ── 9. Bootstrap ─────────────────────────────────────────────────────────────
+  # -- 9. Bootstrap -------------------------------------------------------------
   boot_result <- NULL
   if (bootstrap) {
     point_est <- c(est$b_g0, est$b_g1)
 
-    # Few-clusters advisory when clustering is active (under pairs only;
-    # WCB is the recommended fix for this regime).
-    if (!is.null(cluster_var) && boot_type == "pairs") {
+    # Few-clusters advisories.
+    if (!is.null(cluster_var)) {
       n_clust <- length(unique(data[[cluster_var]][!is.na(data[[cluster_var]])]))
-      if (n_clust < 30L) {
+      if (boot_type == "pairs" && n_clust < 30L) {
         warning(sprintf(
           "Pairs-cluster bootstrap with %d clusters. With fewer than ~30 clusters, pairs over-rejects under H0; consider `boot_type = \"wild\"` for better size control (Cameron, Gelbach & Miller 2008).",
+          n_clust
+        ))
+      } else if (boot_type == "wild" && n_clust < 12L) {
+        warning(sprintf(
+          "Wild cluster bootstrap (WCB-U) with %d clusters. With fewer than ~12 clusters, the restricted variant has better size control; consider `boot_type = \"wild_restricted\"` (MacKinnon & Webb 2017).",
           n_clust
         ))
       }
     }
 
-    if (boot_type == "wild") {
+    if (boot_type %in% c("wild", "wild_restricted")) {
       boot_result <- run_wild_bootstrap(
         fit           = model_result$fit,
         X             = dm$X,
@@ -718,7 +729,8 @@ wsga_did <- function(formula,
         coef_g0_name  = model_result$coef_g0_name,
         coef_g1_name  = model_result$coef_g1_name,
         B             = bsreps,
-        seed          = seed
+        seed          = seed,
+        restricted    = identical(boot_type, "wild_restricted")
       )
     } else {
       # Closure capturing all configuration for one bootstrap replicate
@@ -795,7 +807,7 @@ wsga_did <- function(formula,
     }
   }
 
-  # ── 10. Assemble output ──────────────────────────────────────────────────────
+  # -- 10. Assemble output ------------------------------------------------------
   data$.wsga_x <- NULL  # clean up
 
   nobs <- c(
@@ -844,7 +856,7 @@ wsga_did <- function(formula,
 }
 
 
-# ── Helper: build bootstrap-replicate closure ──────────────────────────────────
+# -- Helper: build bootstrap-replicate closure ----------------------------------
 make_boot_rep <- function(design = "rdd",
                           outcome_name, running_name, cutoff, bwidth,
                           unit_name = NULL, time_name = NULL,
@@ -936,13 +948,13 @@ make_boot_rep <- function(design = "rdd",
 }
 
 
-# ── Helper: coerce obs_weights to a length-n vector ───────────────────────────
+# -- Helper: coerce obs_weights to a length-n vector ---------------------------
 coerce_obs_wt <- function(obs_weights, n) {
   if (is.null(obs_weights)) rep(1, n) else obs_weights
 }
 
 
-# ── Helper: DiD input validation ──────────────────────────────────────────────
+# -- Helper: DiD input validation ----------------------------------------------
 # Q9b checks. Returns the resolved `post_value` and an unbalanced-panel count.
 # Errors on hard violations; warns once on unbalanced panel.
 validate_did_data <- function(data, unit, time, treat, sgroup, balance,
@@ -1007,7 +1019,7 @@ validate_did_data <- function(data, unit, time, treat, sgroup, balance,
 }
 
 
-# ── S3 methods ────────────────────────────────────────────────────────────────
+# -- S3 methods ----------------------------------------------------------------
 
 #' @export
 print.wsga <- function(x, ...) {
@@ -1051,8 +1063,10 @@ print.wsga <- function(x, ...) {
 
   if (use_boot) {
     ps_tag <- if (isTRUE(x$fixed_ps)) " [PS fixed]" else ""
-    boot_label <- if (identical(x$boot_type, "wild")) "Wild cluster bootstrap"
-                  else "Cluster bootstrap"
+    boot_label <- switch(x$boot_type,
+                         wild             = "Wild cluster bootstrap (WCB-U)",
+                         wild_restricted  = "Wild cluster bootstrap (WCB-R)",
+                         "Cluster bootstrap")
     if (!is.null(x$bootstrap$N_clusters)) {
       total_reps <- x$bootstrap$B_ok + x$bootstrap$failed
       cat(sprintf("%s: %d/%d reps, clustered on '%s' (%d clusters)%s\n",

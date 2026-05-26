@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 1.2.2 2026-05-26}{...}
+{* *! version 1.3.0 2026-05-26}{...}
 {viewerjumpto "Stored results" "wsga_did##results"}{...}
 {title:Title}
 
@@ -43,7 +43,8 @@
 {synopt:{opt seed(#)}}RNG seed for reproducibility{p_end}
 {synopt:{opt fixedps}}hold propensity score fixed across bootstrap reps (diagnostic){p_end}
 {synopt:{opt blockbootstrap(varname)}}stratify the unit-level cluster resample by {it:varname}; must be unit-constant{p_end}
-{synopt:{opt wildcluster}}use wild cluster bootstrap (WCB-U, Rademacher signs) instead of pairs; recommended at < ~30 clusters; ignores {opt blockbootstrap} and does not refit the propensity score (so it does not propagate IPW uncertainty); see {it:Remarks}{p_end}
+{synopt:{opt wildcluster}}unrestricted wild cluster bootstrap (WCB-U, Rademacher signs); recommended at < ~30 clusters; see {it:Remarks}{p_end}
+{synopt:{opt wcbrestricted}}restricted wild cluster bootstrap (WCB-R); recommended at < ~12 clusters; see {it:Remarks}{p_end}
 {synopt:{opt weights(varname)}}pre-existing observation weights{p_end}
 {synoptline}
 
@@ -74,8 +75,11 @@ Clustering is always on {it:unit}.
 {pstd}With cluster bootstrap (pairs):{p_end}
 {phang2}{cmd:. wsga did Y M, sgroup(G) unit(id) time(t) treat(D) bsreps(200) seed(1)}{p_end}
 
-{pstd}With wild cluster bootstrap (recommended at small G):{p_end}
+{pstd}With unrestricted wild cluster bootstrap (recommended at G < ~30):{p_end}
 {phang2}{cmd:. wsga did Y M, sgroup(G) unit(id) time(t) treat(D) bsreps(200) seed(1) wildcluster}{p_end}
+
+{pstd}With restricted wild cluster bootstrap (recommended at G < ~12):{p_end}
+{phang2}{cmd:. wsga did Y M, sgroup(G) unit(id) time(t) treat(D) bsreps(200) seed(1) wcbrestricted}{p_end}
 
 
 {marker remarks}{...}
@@ -91,12 +95,29 @@ a one-time advisory is emitted.{p_end}
 
 {pstd}
 The {opt wildcluster} option requests the unrestricted wild cluster bootstrap
-(WCB-U) with Rademacher signs at the cluster level.  This conditions on the
-data (residuals from the original fit are sign-flipped at the unit level) and
-the regression is refit on the bootstrap outcome.  WCB-U gives substantially
-better size control than pairs at small G.  Caveat: because the data is held
-fixed, the propensity score is {it:not} refit per replicate, so WCB-U does not
-propagate IPW estimation uncertainty.  Use {opt wildcluster} when honest size
+(WCB-U) with Rademacher signs at the cluster level.  Residuals from the
+original (unrestricted) fit are sign-flipped at the unit level; the
+unrestricted model is refit on the resulting bootstrap outcome.  WCB-U gives
+substantially better size control than pairs at small G.  P-values use the
+recentered formula {it:(1 + #{|draw - est| >= |est|}) / (B+1)}.
+Recommended when G < ~30.{p_end}
+
+{pstd}
+The {opt wcbrestricted} option requests the restricted wild cluster bootstrap
+(WCB-R; MacKinnon and Webb 2017, 2018).  For each of the three null hypotheses
+(H0: b_G0=0, H0: b_G1=0, H0: b_G0=b_G1), the restricted model imposing that
+null is fit; its residuals are sign-flipped at the unit level; and the
+unrestricted model is refit on the resulting bootstrap outcome to obtain the
+test statistic.  Because the null is imposed in the residuals, the draws are
+centered at zero under H0, so p-values use the non-recentered formula
+{it:(1 + #{|draw| >= |est|}) / (B+1)}.  Confidence intervals remain empirical
+percentile CIs from unrestricted draws.  WCB-R has better size control than
+WCB-U at very small G (< ~12) at the cost of four model fits per replicate
+instead of one.  Recommended when G < ~12.{p_end}
+
+{pstd}
+Caveat: neither WCB variant refits the propensity score per replicate, so
+neither propagates IPW estimation uncertainty.  Use WCB when honest size
 under H0 is the binding concern at small G.{p_end}
 
 
@@ -136,7 +157,7 @@ under H0 is the binding concern at small G.{p_end}
 {synopt:{cmd:e(cmd)}}{cmd:wsga}{p_end}
 {synopt:{cmd:e(subcmd)}}{cmd:did}{p_end}
 {synopt:{cmd:e(depvar)}}name of dependent variable{p_end}
-{synopt:{cmd:e(boot_type)}}(bootstrap) {cmd:pairs} or {cmd:wild}{p_end}
+{synopt:{cmd:e(boot_type)}}(bootstrap) {cmd:pairs}, {cmd:wild}, or {cmd:wild_restricted}{p_end}
 
 {p2col 5 23 26 2: Matrices}{p_end}
 {synopt:{cmd:e(b)}}1{cmd:x}2 coefficient vector with columns named {cmd:G0_Z} and {cmd:G1_Z}{p_end}

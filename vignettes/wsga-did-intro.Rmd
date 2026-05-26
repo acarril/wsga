@@ -26,7 +26,7 @@ weighting (IPW) on subgroup membership corrects for that imbalance.
 We use the bundled `wsga_did_synth` dataset: a balanced two-period panel of
 500 units (1,000 rows). The binary subgroup `sgroup`, the moderator `m`, and
 the treatment indicator `D` are all constant within unit. `D` is independent of
-`sgroup`, but `m` has a higher mean in `sgroup = 1` — exactly the imbalance
+`sgroup`, but `m` has a higher mean in `sgroup = 1` -- exactly the imbalance
 that IPW is designed to address. True per-subgroup effects are
 `tau_0 = 1`, `tau_1 = 3` (true difference = 2).
 
@@ -41,7 +41,7 @@ table(wsga_did_synth$sgroup, wsga_did_synth$time)
 
 The unweighted estimator fits a long-form TWFE regression (unit and time
 fixed effects) interacted with subgroup. With `noipsw = TRUE`, no IPW
-correction is applied — coefficients reflect both the subgroup effect and
+correction is applied -- coefficients reflect both the subgroup effect and
 the contribution of imbalanced moderators.
 
 ```{r noipsw}
@@ -86,7 +86,7 @@ treatment effect is identified off the treated cells.
 ### Step 3: Cluster bootstrap inference
 
 `wsga_did()` defaults `cluster_var` to `unit`, so the bootstrap is a
-pairs-cluster bootstrap over panel units (Cameron–Gelbach–Miller).
+pairs-cluster bootstrap over panel units (Cameron-Gelbach-Miller).
 
 ```{r bootstrap, cache = TRUE}
 fit_boot <- wsga_did(
@@ -114,4 +114,5 @@ clusters were resampled.
 | `treat`       | Column name of the binary treatment indicator (constant within unit). |
 | `post_value`  | Value of `time` denoting the post period. Defaults to `max(time)`. |
 | `cluster_var` | Column defining clusters for the bootstrap and analytical SE. Defaults to `unit` for DiD. |
+| `boot_type`   | `"pairs"` (default), `"wild"` (WCB-U, recommended for G < ~30), or `"wild_restricted"` (WCB-R, recommended for G < ~12). WCB-R uses restricted residuals to form the bootstrap outcome; p-values use a non-recentered formula; CIs remain empirical percentile from unrestricted draws. See MacKinnon and Webb (2017, 2018). |
 | `inference`   | `"empirical"` (default with bootstrap), `"normal"`, or `"analytical"` (cluster-robust sandwich when `cluster_var` is set). |

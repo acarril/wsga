@@ -1,4 +1,4 @@
-*! 1.2.2 Alvaro Carril 2026-05-26
+*! 1.3.0 Alvaro Carril 2026-05-26
 
 // -- Dispatcher ----------------------------------------------------------------
 program define wsga
@@ -28,7 +28,7 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     BALance(varlist numeric) DIBALance probit ///
     IVregress REDUCEDform FIRSTstage vce(string) p(int 1) m(int 2) rbalance(int 0) ///
     noBOOTstrap bsreps(real 200) FIXEDbootstrap FIXEDps BLOCKbootstrap(string) NORMal noipsw weights(string) ///
-    CLuster(varname) WILDcluster ///
+    CLuster(varname) WILDcluster WCBRestricted ///
     Seed(string) ]
 
 // --- Validate required options ------------------------------------------------
@@ -58,6 +58,30 @@ if "`wildcluster'" != "" & "`ivregress'" != "" {
 if "`wildcluster'" != "" & "`blockbootstrap'" != "" {
   di as text ///
 "Note: {bf:blockbootstrap} is ignored under {bf:wildcluster} (Rademacher signs are drawn unstratified)."
+}
+if "`wcbrestricted'" != "" & "`bootstrap'" == "nobootstrap" {
+  di as error ///
+"option {bf:wcbrestricted} requires the bootstrap loop; cannot be combined with {bf:nobootstrap}."
+  exit 198
+}
+if "`wcbrestricted'" != "" & "`cluster'" == "" {
+  di as error ///
+"option {bf:wcbrestricted} requires {bf:cluster(varname)}; no natural default for RDD."
+  exit 198
+}
+if "`wcbrestricted'" != "" & "`ivregress'" != "" {
+  di as error ///
+"option {bf:wcbrestricted} is not supported with {bf:ivregress} (fuzzy RD via 2SLS)."
+  exit 198
+}
+if "`wcbrestricted'" != "" & "`wildcluster'" != "" {
+  di as error ///
+"options {bf:wildcluster} and {bf:wcbrestricted} are mutually exclusive."
+  exit 198
+}
+if "`wcbrestricted'" != "" & "`blockbootstrap'" != "" {
+  di as text ///
+"Note: {bf:blockbootstrap} is ignored under {bf:wcbrestricted} (Rademacher signs are drawn unstratified)."
 }
 // ------------------------------------------------------------------------------
 
@@ -359,7 +383,8 @@ if "`ipsw'" != "noipsw" & `: list sizeof balance' > 0 {
 }
 if "`seed'" != "" local psw_boot_opts `psw_boot_opts' seed(`seed')
 if "`cluster'" != "" local psw_boot_opts `psw_boot_opts' cluster(`cluster')
-if "`wildcluster'" != "" local psw_boot_opts `psw_boot_opts' wildcluster
+if "`wildcluster'"   != "" local psw_boot_opts `psw_boot_opts' wildcluster
+if "`wcbrestricted'" != "" local psw_boot_opts `psw_boot_opts' wcbrestricted
 
 // Cluster validation + G < 30 advisory when clustering is active
 if "`cluster'" != "" & "`bootstrap'" != "nobootstrap" {
@@ -373,9 +398,13 @@ if "`cluster'" != "" & "`bootstrap'" != "nobootstrap" {
   }
   qui levelsof `cluster' if `touse' & `bwidth', local(_clusters)
   local _N_clust : word count `_clusters'
-  if `_N_clust' < 30 & "`wildcluster'" == "" {
+  if `_N_clust' < 30 & "`wildcluster'" == "" & "`wcbrestricted'" == "" {
     di as text ///
 "Note: pairs-cluster bootstrap with " as result %4.0f `_N_clust' as text " clusters.  With fewer than ~30 clusters, pairs over-rejects under H0; consider the {bf:wildcluster} option for better size control (Cameron, Gelbach & Miller 2008)."
+  }
+  if `_N_clust' < 12 & "`wildcluster'" != "" {
+    di as text ///
+"Note: WCB-U with " as result %4.0f `_N_clust' as text " clusters.  With fewer than ~12 clusters, the restricted variant has better size control; consider {bf:wcbrestricted} (MacKinnon & Webb 2017)."
   }
 }
 
@@ -754,7 +783,7 @@ program define _wsga_rdd_myboo, eclass
   syntax anything [, PSW IPSWeight(name) KERNELipsw(name) KWT(name) ///
     TOuse(name) BWIDTH(string) BALance(varlist) OWeights(name) ///
     M(integer 2) BINarymodel(string) PSCore(name) COmsup Seed(string) ///
-    CLuster(varname) WILDcluster]
+    CLuster(varname) WILDcluster WCBRestricted]
 
   local svar : word 1 of `anything'
   local cvar : word 2 of `anything'
@@ -788,7 +817,7 @@ program define _wsga_rdd_myboo, eclass
   //      data; does not propagate IPW uncertainty -- intentional, CGM 2008).
   local _saved_cmdline = e(cmdline)
   local _saved_depvar  = e(depvar)
-  if "`wildcluster'" != "" {
+  if "`wildcluster'" != "" | "`wcbrestricted'" != "" {
     tempvar _wsga_xb _wsga_resid
     qui predict double `_wsga_xb'    if `esample', xb
     qui predict double `_wsga_resid' if `esample', residuals
@@ -797,28 +826,108 @@ program define _wsga_rdd_myboo, eclass
     // Cmdline shape after `regress' is: "<cmd> <depvar> <rhs ...>".
     gettoken _wsga_cmd_name _wsga_cmd_rest : _saved_cmdline
     gettoken _wsga_olddep   _wsga_cmd_rhs  : _wsga_cmd_rest
+
+    if "`wcbrestricted'" != "" {
+      // WCB-R: fit three restricted models before the loop to obtain
+      // restricted xb and residuals for each null hypothesis.
+      // The cmdline treatment term "i.svar#1.cvar" is substituted to impose
+      // each restriction; the unrestricted model is refit inside the loop.
+      local _rhs_r0    = subinstr("`_wsga_cmd_rhs'", ///
+        "i.`svar'#1.`cvar'", "1.`svar'#1.`cvar'", 1)   // H0: G0_Z=0
+      local _rhs_r1    = subinstr("`_wsga_cmd_rhs'", ///
+        "i.`svar'#1.`cvar'", "0.`svar'#1.`cvar'", 1)   // H0: G1_Z=0
+      local _rhs_rdiff = subinstr("`_wsga_cmd_rhs'", ///
+        "i.`svar'#1.`cvar'", "1.`cvar'", 1)             // H0: G0_Z=G1_Z
+
+      tempvar _wsga_xb_r0 _wsga_resid_r0 ///
+              _wsga_xb_r1 _wsga_resid_r1 ///
+              _wsga_xb_rdiff _wsga_resid_rdiff
+
+      qui `_wsga_cmd_name' `_wsga_olddep' `_rhs_r0'
+      qui predict double `_wsga_xb_r0'    if `esample', xb
+      qui predict double `_wsga_resid_r0' if `esample', residuals
+
+      qui `_wsga_cmd_name' `_wsga_olddep' `_rhs_r1'
+      qui predict double `_wsga_xb_r1'    if `esample', xb
+      qui predict double `_wsga_resid_r1' if `esample', residuals
+
+      qui `_wsga_cmd_name' `_wsga_olddep' `_rhs_rdiff'
+      qui predict double `_wsga_xb_rdiff'    if `esample', xb
+      qui predict double `_wsga_resid_rdiff' if `esample', residuals
+
+      // Restore the unrestricted fit so e(b) etc. are correct for the loop
+      qui `_wsga_cmd_name' `_wsga_olddep' `_wsga_cmd_rhs'
+
+      // Running p-value counters for restricted draws
+      scalar _wcbr_count_g0    = 0
+      scalar _wcbr_count_g1    = 0
+      scalar _wcbr_count_diff  = 0
+      scalar _wcbr_B_g0        = 0
+      scalar _wcbr_B_g1        = 0
+      scalar _wcbr_B_diff      = 0
+    }
   }
 
   // Start bootstrap
   di ""
-  local _boot_title = cond("`wildcluster'" != "", "Wild cluster bootstrap", ///
-                        cond("`cluster'" != "", "Cluster bootstrap", "Bootstrap replications"))
+  local _boot_title = cond("`wcbrestricted'" != "", "Wild cluster bootstrap (WCB-R)", ///
+                        cond("`wildcluster'" != "", "Wild cluster bootstrap (WCB-U)", ///
+                          cond("`cluster'" != "", "Cluster bootstrap", "Bootstrap replications")))
   _dots 0, title(`_boot_title') reps(`B')
   cap mat drop cumulative
   if "`seed'" != "" set seed `seed'
   tempvar COMSUP_b
   forvalues i=1/`B' {
     preserve
-    if "`wildcluster'" != "" {
-      // WCB-U: draw one Rademacher sign per cluster, broadcast to rows,
-      // y_star = xb + sign * resid; refit `<cmd> y_star <rhs>` (#37: never
-      // touch the user's outcome variable).
+    if "`wildcluster'" != "" | "`wcbrestricted'" != "" {
+      // Draw one Rademacher sign per cluster, broadcast to rows.
       tempvar _wsga_u _wsga_sign _wsga_ystar
       qui by `cluster', sort: gen double `_wsga_u' = runiform() if _n == 1
       qui by `cluster': replace `_wsga_u' = `_wsga_u'[1]
-      qui gen double `_wsga_sign'  = cond(`_wsga_u' < 0.5, -1, 1) if `esample'
+      qui gen double `_wsga_sign' = cond(`_wsga_u' < 0.5, -1, 1) if `esample'
+
+      // Unrestricted y_star -> CI / SE draw (same for WCB-U and WCB-R)
       qui gen double `_wsga_ystar' = `_wsga_xb' + `_wsga_sign' * `_wsga_resid' if `esample'
       qui `_wsga_cmd_name' `_wsga_ystar' `_wsga_cmd_rhs'
+      // Coefficient extraction happens below (shared with pairs path)
+
+      if "`wcbrestricted'" != "" {
+        // Three restricted refits on unrestricted model; p-value counters updated.
+        // P-value formula: (1 + #{|draw| >= |est|}) / (B+1) -- no recentering,
+        // because restricted draws are centred at 0 under H0 by construction
+        // (MacKinnon & Webb 2017, eq. 8).
+        tempvar _wsga_ys_r0 _wsga_ys_r1 _wsga_ys_rdiff
+        qui gen double `_wsga_ys_r0' = ///
+          `_wsga_xb_r0' + `_wsga_sign' * `_wsga_resid_r0' if `esample'
+        capture qui `_wsga_cmd_name' `_wsga_ys_r0' `_wsga_cmd_rhs'
+        if !_rc {
+          scalar _wcbr_draw_g0 = _b[0.`svar'#1.`cvar']
+          if abs(_wcbr_draw_g0) >= abs(b[1,1]) ///
+            scalar _wcbr_count_g0 = _wcbr_count_g0 + 1
+          scalar _wcbr_B_g0 = _wcbr_B_g0 + 1
+        }
+
+        qui gen double `_wsga_ys_r1' = ///
+          `_wsga_xb_r1' + `_wsga_sign' * `_wsga_resid_r1' if `esample'
+        capture qui `_wsga_cmd_name' `_wsga_ys_r1' `_wsga_cmd_rhs'
+        if !_rc {
+          scalar _wcbr_draw_g1 = _b[1.`svar'#1.`cvar']
+          if abs(_wcbr_draw_g1) >= abs(b[1,2]) ///
+            scalar _wcbr_count_g1 = _wcbr_count_g1 + 1
+          scalar _wcbr_B_g1 = _wcbr_B_g1 + 1
+        }
+
+        qui gen double `_wsga_ys_rdiff' = ///
+          `_wsga_xb_rdiff' + `_wsga_sign' * `_wsga_resid_rdiff' if `esample'
+        capture qui `_wsga_cmd_name' `_wsga_ys_rdiff' `_wsga_cmd_rhs'
+        if !_rc {
+          scalar _wcbr_draw_diff = _b[1.`svar'#1.`cvar'] - _b[0.`svar'#1.`cvar']
+          scalar _orig_diff = b[1,2] - b[1,1]
+          if abs(_wcbr_draw_diff) >= abs(_orig_diff) ///
+            scalar _wcbr_count_diff = _wcbr_count_diff + 1
+          scalar _wcbr_B_diff = _wcbr_B_diff + 1
+        }
+      }
       // Skip PS refit block below; jump to coefficient extraction
     }
     else {
@@ -935,28 +1044,36 @@ program define _wsga_rdd_myboo, eclass
     ereturn scalar N_clust = `_N_clust'
     ereturn local clustvar `cluster'
   }
-  ereturn local boot_type = cond("`wildcluster'" != "", "wild", "pairs")
-  // Empirical p-values for subgroups
-  // Recentered: count draws where |draw - est| >= |est|, testing H0: coef=0
-  cap scalar drop bscoef
-  forvalues g = 0/1 {
-    local count = 0
-    forvalues i = 1/`B' {
-      scalar bscoef = cumulative[`i',`=`g'+1']
-      if abs(bscoef - b[1,`=`g'+1']) >= abs(b[1,`=`g'+1']) local count = `count'+1
+  ereturn local boot_type = cond("`wcbrestricted'" != "", "wild_restricted", ///
+                               cond("`wildcluster'" != "", "wild", "pairs"))
+  // P-values
+  if "`wcbrestricted'" != "" {
+    // WCB-R: non-recentered formula using restricted draws
+    ereturn scalar p_g0   = (1 + _wcbr_count_g0)   / (_wcbr_B_g0   + 1)
+    ereturn scalar p_g1   = (1 + _wcbr_count_g1)   / (_wcbr_B_g1   + 1)
+    ereturn scalar p_diff = (1 + _wcbr_count_diff)  / (_wcbr_B_diff + 1)
+  }
+  else {
+    // WCB-U and pairs: recentered formula on unrestricted draws
+    cap scalar drop bscoef
+    forvalues g = 0/1 {
+      local count = 0
+      forvalues i = 1/`B' {
+        scalar bscoef = cumulative[`i',`=`g'+1']
+        if abs(bscoef - b[1,`=`g'+1']) >= abs(b[1,`=`g'+1']) local count = `count'+1
+      }
+      scalar pval`g' = (1+`count') / (`B' + 1)
+      ereturn scalar p_g`g' = pval`g'
     }
-    scalar pval`g' = (1+`count') / (`B' + 1)
-    ereturn scalar p_g`g' = pval`g'
+    scalar orig_diff = b[1,2] - b[1,1]
+    local count_diff = 0
+    forvalues i = 1/`B' {
+      scalar bscoef = cumulative[`i',3]
+      if abs(bscoef - orig_diff) >= abs(orig_diff) local count_diff = `count_diff' + 1
+    }
+    scalar pval_diff = (1 + `count_diff') / (`B' + 1)
+    ereturn scalar p_diff = pval_diff
   }
-  // Empirical p-value for diff (column 3)
-  scalar orig_diff = b[1,2] - b[1,1]
-  local count_diff = 0
-  forvalues i = 1/`B' {
-    scalar bscoef = cumulative[`i',3]
-    if abs(bscoef - orig_diff) >= abs(orig_diff) local count_diff = `count_diff' + 1
-  }
-  scalar pval_diff = (1 + `count_diff') / (`B' + 1)
-  ereturn scalar p_diff = pval_diff
   // Empirical confidence intervals
   svmat cumulative, names(_subgroup)
   forvalues g = 0/1 {
@@ -1258,22 +1375,36 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     IPSWeight(name) PSCore(name) comsup ///
     vce(string) m(int 2) ///
     noBOOTstrap bsreps(real 200) FIXEDbootstrap FIXEDps BLOCKbootstrap(string) ///
-    WILDcluster ///
+    WILDcluster WCBRestricted ///
     NORMal noipsw weights(string) Seed(string) ]
 
   // -- Sample mask
   marksample touse, novarlist
   markout `touse' `unit' `time' `treat' `sgroup'
 
-  // -- wildcluster validation: requires the bootstrap loop (it IS the loop).
+  // -- wildcluster / wcbrestricted validation
   if "`wildcluster'" != "" & "`bootstrap'" == "nobootstrap" {
     di as error ///
 "option {bf:wildcluster} requires the bootstrap loop; cannot be combined with {bf:nobootstrap}."
     exit 198
   }
+  if "`wcbrestricted'" != "" & "`bootstrap'" == "nobootstrap" {
+    di as error ///
+"option {bf:wcbrestricted} requires the bootstrap loop; cannot be combined with {bf:nobootstrap}."
+    exit 198
+  }
+  if "`wcbrestricted'" != "" & "`wildcluster'" != "" {
+    di as error ///
+"options {bf:wildcluster} and {bf:wcbrestricted} are mutually exclusive."
+    exit 198
+  }
   if "`wildcluster'" != "" & "`blockbootstrap'" != "" {
     di as text ///
 "Note: {bf:blockbootstrap} is ignored under {bf:wildcluster} (Rademacher signs are drawn unstratified)."
+  }
+  if "`wcbrestricted'" != "" & "`blockbootstrap'" != "" {
+    di as text ///
+"Note: {bf:blockbootstrap} is ignored under {bf:wcbrestricted} (Rademacher signs are drawn unstratified)."
   }
 
   // -- Outcome and covariates
@@ -1468,17 +1599,55 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   if use_bootstrap {
     qui levelsof `unit' if `touse', local(_clusters)
     scalar N_clust = `: word count `_clusters''
-    if N_clust < 30 & "`wildcluster'" == "" {
+    if N_clust < 30 & "`wildcluster'" == "" & "`wcbrestricted'" == "" {
       di as text ///
 "Note: pairs-cluster bootstrap with " as result %4.0f N_clust as text " clusters.  With fewer than ~30 clusters, pairs over-rejects under H0; consider the {bf:wildcluster} option for better size control (Cameron, Gelbach & Miller 2008)."
     }
+    if N_clust < 12 & "`wildcluster'" != "" {
+      di as text ///
+"Note: WCB-U with " as result %4.0f N_clust as text " clusters.  With fewer than ~12 clusters, the restricted variant has better size control; consider {bf:wcbrestricted} (MacKinnon & Webb 2017)."
+    }
 
-    if "`wildcluster'" != "" {
-      // Store fitted values (X*beta + unit FE) and idiosyncratic residuals
-      // BEFORE saving the tempfile so they survive the per-rep reload.
+    if "`wildcluster'" != "" | "`wcbrestricted'" != "" {
+      // Store unrestricted fitted values and idiosyncratic residuals.
       tempvar _wsga_yhat _wsga_e_hat
       qui predict double `_wsga_yhat'  if `_did_esample', xbu
       qui predict double `_wsga_e_hat' if `_did_esample', e
+
+      if "`wcbrestricted'" != "" {
+        // WCB-R: fit three restricted models and store their xbu/e.
+        tempvar _wsga_Z_pooled
+        qui gen byte `_wsga_Z_pooled' = `G0_Z' + `G1_Z'
+
+        tempvar _wsga_yhat_r0 _wsga_e_r0
+        qui xtreg `depvar' `G1_Z' `G0_post' `G1_post' `g0_covs' `g1_covs' ///
+          [pw=`ipsweight'] if `touse' & `ipsweight' > 0, fe vce(cluster `unit')
+        qui predict double `_wsga_yhat_r0' if `_did_esample', xbu
+        qui predict double `_wsga_e_r0'    if `_did_esample', e
+
+        tempvar _wsga_yhat_r1 _wsga_e_r1
+        qui xtreg `depvar' `G0_Z' `G0_post' `G1_post' `g0_covs' `g1_covs' ///
+          [pw=`ipsweight'] if `touse' & `ipsweight' > 0, fe vce(cluster `unit')
+        qui predict double `_wsga_yhat_r1' if `_did_esample', xbu
+        qui predict double `_wsga_e_r1'    if `_did_esample', e
+
+        tempvar _wsga_yhat_rdiff _wsga_e_rdiff
+        qui xtreg `depvar' `_wsga_Z_pooled' `G0_post' `G1_post' `g0_covs' `g1_covs' ///
+          [pw=`ipsweight'] if `touse' & `ipsweight' > 0, fe vce(cluster `unit')
+        qui predict double `_wsga_yhat_rdiff' if `_did_esample', xbu
+        qui predict double `_wsga_e_rdiff'    if `_did_esample', e
+
+        // Restore unrestricted fit
+        qui xtreg `depvar' `rhs' [pw=`ipsweight'] ///
+          if `touse' & `ipsweight' > 0, fe vce(cluster `unit')
+
+        scalar _wcbr_cnt_g0   = 0
+        scalar _wcbr_cnt_g1   = 0
+        scalar _wcbr_cnt_diff = 0
+        scalar _wcbr_B_g0     = 0
+        scalar _wcbr_B_g1     = 0
+        scalar _wcbr_B_diff   = 0
+      }
     }
 
     tempfile _wsga_did_panel
@@ -1487,8 +1656,11 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     tempname _wsga_did_draws
     matrix `_wsga_did_draws' = J(`bsreps', 2, .)
 
-    if "`wildcluster'" != "" {
-      display as text "Wild cluster bootstrap (`bsreps' reps):"
+    if "`wcbrestricted'" != "" {
+      display as text "Wild cluster bootstrap WCB-R (`bsreps' reps):"
+    }
+    else if "`wildcluster'" != "" {
+      display as text "Wild cluster bootstrap WCB-U (`bsreps' reps):"
     }
     else {
       display as text "Cluster bootstrap (`bsreps' reps):"
@@ -1497,20 +1669,55 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
     forvalues _b = 1/`bsreps' {
       qui use `_wsga_did_panel', clear
       capture {
-        if "`wildcluster'" != "" {
-          // --- WCB-U: Rademacher signs, one per unit, broadcast to all rows.
+        if "`wildcluster'" != "" | "`wcbrestricted'" != "" {
+          // Draw one Rademacher sign per unit, broadcast to all rows.
           tempvar _wsga_u _wsga_sign _wsga_ystar
           qui by `unit', sort: gen double `_wsga_u' = runiform() if _n == 1
           qui by `unit': replace `_wsga_u' = `_wsga_u'[1]
           qui gen double `_wsga_sign' = cond(`_wsga_u' < 0.5, -1, 1)
-          qui gen double `_wsga_ystar' = `_wsga_yhat' + `_wsga_sign' * `_wsga_e_hat'
 
-          // Refit on bootstrap outcome; weights and X fixed at original values.
+          // Unrestricted y_star -> CI/SE draw
+          qui gen double `_wsga_ystar' = `_wsga_yhat' + `_wsga_sign' * `_wsga_e_hat'
           qui xtreg `_wsga_ystar' `rhs' [pw=`ipsweight'] ///
             if `_did_esample' & `ipsweight' > 0, fe vce(cluster `unit')
           matrix `_wsga_did_draws'[`_b', 1] = _b[`G0_Z']
           matrix `_wsga_did_draws'[`_b', 2] = _b[`G1_Z']
           scalar B_ok = B_ok + 1
+
+          if "`wcbrestricted'" != "" {
+            // Three restricted refits for p-values (non-recentered formula).
+            tempvar _wsga_ys_r0 _wsga_ys_r1 _wsga_ys_rdiff
+
+            qui gen double `_wsga_ys_r0' = ///
+              `_wsga_yhat_r0' + `_wsga_sign' * `_wsga_e_r0'
+            capture qui xtreg `_wsga_ys_r0' `rhs' [pw=`ipsweight'] ///
+              if `_did_esample' & `ipsweight' > 0, fe vce(cluster `unit')
+            if !_rc {
+              scalar _wcbr_d_g0 = _b[`G0_Z']
+              if abs(_wcbr_d_g0) >= abs(b_g0) scalar _wcbr_cnt_g0 = _wcbr_cnt_g0 + 1
+              scalar _wcbr_B_g0 = _wcbr_B_g0 + 1
+            }
+
+            qui gen double `_wsga_ys_r1' = ///
+              `_wsga_yhat_r1' + `_wsga_sign' * `_wsga_e_r1'
+            capture qui xtreg `_wsga_ys_r1' `rhs' [pw=`ipsweight'] ///
+              if `_did_esample' & `ipsweight' > 0, fe vce(cluster `unit')
+            if !_rc {
+              scalar _wcbr_d_g1 = _b[`G1_Z']
+              if abs(_wcbr_d_g1) >= abs(b_g1) scalar _wcbr_cnt_g1 = _wcbr_cnt_g1 + 1
+              scalar _wcbr_B_g1 = _wcbr_B_g1 + 1
+            }
+
+            qui gen double `_wsga_ys_rdiff' = ///
+              `_wsga_yhat_rdiff' + `_wsga_sign' * `_wsga_e_rdiff'
+            capture qui xtreg `_wsga_ys_rdiff' `rhs' [pw=`ipsweight'] ///
+              if `_did_esample' & `ipsweight' > 0, fe vce(cluster `unit')
+            if !_rc {
+              scalar _wcbr_d_diff = _b[`G1_Z'] - _b[`G0_Z']
+              if abs(_wcbr_d_diff) >= abs(b_diff) scalar _wcbr_cnt_diff = _wcbr_cnt_diff + 1
+              scalar _wcbr_B_diff = _wcbr_B_diff + 1
+            }
+          }
         }
         else {
         if "`blockbootstrap'" != "" {
@@ -1633,12 +1840,20 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
       scalar ci_lb_diff  = r(r1)
       scalar ci_ub_diff  = r(r2)
 
-      qui count if abs(_draw1    - b_g0)   >= abs(b_g0)
-      scalar p_g0    = (1 + r(N)) / (B_ok + 1)
-      qui count if abs(_draw2    - b_g1)   >= abs(b_g1)
-      scalar p_g1    = (1 + r(N)) / (B_ok + 1)
-      qui count if abs(_drawdiff - b_diff) >= abs(b_diff)
-      scalar p_diff  = (1 + r(N)) / (B_ok + 1)
+      if "`wcbrestricted'" != "" {
+        // WCB-R: non-recentered formula from restricted draws
+        scalar p_g0   = (1 + _wcbr_cnt_g0)   / (_wcbr_B_g0   + 1)
+        scalar p_g1   = (1 + _wcbr_cnt_g1)   / (_wcbr_B_g1   + 1)
+        scalar p_diff = (1 + _wcbr_cnt_diff)  / (_wcbr_B_diff + 1)
+      }
+      else {
+        qui count if abs(_draw1    - b_g0)   >= abs(b_g0)
+        scalar p_g0    = (1 + r(N)) / (B_ok + 1)
+        qui count if abs(_draw2    - b_g1)   >= abs(b_g1)
+        scalar p_g1    = (1 + r(N)) / (B_ok + 1)
+        qui count if abs(_drawdiff - b_diff) >= abs(b_diff)
+        scalar p_diff  = (1 + r(N)) / (B_ok + 1)
+      }
     }
     restore
   }
@@ -1689,7 +1904,9 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   di as text "N (G=0): " as result %4.0f N_G0 ///
      as text "   N (G=1): " as result %4.0f N_G1
   if use_bootstrap {
-    local _boot_label = cond("`wildcluster'" != "", "Wild cluster bootstrap", "Cluster bootstrap")
+    local _boot_label = cond("`wcbrestricted'" != "", "Wild cluster bootstrap (WCB-R)", ///
+                          cond("`wildcluster'" != "", "Wild cluster bootstrap (WCB-U)", ///
+                            "Cluster bootstrap"))
     di as text "`_boot_label': " as result %4.0f B_ok ///
        as text " / " as result `bsreps' ///
        as text " reps, clustered on '" as result "`unit'" ///
@@ -1788,7 +2005,8 @@ syntax varlist(min=1 numeric fv) [if] [in], ///
   if use_bootstrap {
     ereturn scalar B_ok    = B_ok
     ereturn scalar N_clust = N_clust
-    ereturn local boot_type = cond("`wildcluster'" != "", "wild", "pairs")
+    ereturn local boot_type = cond("`wcbrestricted'" != "", "wild_restricted", ///
+                               cond("`wildcluster'" != "", "wild", "pairs"))
   }
 end
 

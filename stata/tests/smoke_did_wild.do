@@ -1,4 +1,4 @@
-// smoke_did_wild.do — tests for `wsga did, wildcluster`
+// smoke_did_wild.do -- tests for `wsga did, wildcluster`
 // Run from rddsga-repo/:
 //   stata-mp -b do stata/tests/smoke_did_wild.do && cat smoke_did_wild.log
 
@@ -7,7 +7,7 @@ use stata/wsga_did_synth, clear
 
 local n_fail = 0
 
-// ── TEST 1: wildcluster runs and posts non-trivial inference ─────────────────
+// -- TEST 1: wildcluster runs and posts non-trivial inference -----------------
 capture wsga did y m, sgroup(sgroup) unit(unit) time(time) treat(D) ///
   bsreps(50) seed(1) noipsw wildcluster
 if _rc != 0 {
@@ -23,7 +23,7 @@ else {
     di "  boot_type = " e(boot_type)
 }
 
-// ── TEST 2: boot_type ereturn is "wild" ──────────────────────────────────────
+// -- TEST 2: boot_type ereturn is "wild" --------------------------------------
 wsga did y m, sgroup(sgroup) unit(unit) time(time) treat(D) ///
   bsreps(20) seed(7) noipsw wildcluster
 if "`e(boot_type)'" == "wild" {
@@ -34,7 +34,7 @@ else {
     local ++n_fail
 }
 
-// ── TEST 3: pairs path still tags boot_type = "pairs" ────────────────────────
+// -- TEST 3: pairs path still tags boot_type = "pairs" ------------------------
 wsga did y m, sgroup(sgroup) unit(unit) time(time) treat(D) ///
   bsreps(20) seed(7) noipsw
 if "`e(boot_type)'" == "pairs" {
@@ -45,7 +45,7 @@ else {
     local ++n_fail
 }
 
-// ── TEST 4: seed makes wildcluster reproducible ──────────────────────────────
+// -- TEST 4: seed makes wildcluster reproducible ------------------------------
 wsga did y m, sgroup(sgroup) unit(unit) time(time) treat(D) ///
   bsreps(30) seed(42) noipsw wildcluster
 scalar _se0_run1   = e(se_g0)
@@ -64,7 +64,7 @@ else {
     local ++n_fail
 }
 
-// ── TEST 5: wildcluster + nobootstrap errors ─────────────────────────────────
+// -- TEST 5: wildcluster + nobootstrap errors ---------------------------------
 capture wsga did y m, sgroup(sgroup) unit(unit) time(time) treat(D) ///
   nobootstrap wildcluster
 if _rc != 0 {
@@ -75,7 +75,7 @@ else {
     local ++n_fail
 }
 
-// ── TEST 6: WCB SE in same order of magnitude as analytical cluster SE ───────
+// -- TEST 6: WCB SE in same order of magnitude as analytical cluster SE -------
 // On the bundled DiD synth (500 units, plenty of clusters), wild SE and
 // analytical cluster-robust SE should be within a factor of 3.
 wsga did y m, sgroup(sgroup) unit(unit) time(time) treat(D) noipsw nobootstrap
@@ -104,4 +104,69 @@ if `n_fail' == 0 {
 else {
     di as error _newline "`n_fail' wildcluster smoke test(s) FAILED."
     exit 1
+}
+
+// -- WCB-R tests --
+local n_fail_r = 0
+
+// TEST: wcbrestricted runs and reports boot_type=wild_restricted
+capture wsga did y m, sgroup(sgroup) unit(unit) time(time) treat(D) ///
+  noipsw bsreps(20) seed(1) wcbrestricted
+if _rc != 0 {
+  di as error "FAIL [wcbrestricted DiD: runs]: rc=" _rc
+  local ++n_fail_r
+}
+else if "`e(boot_type)'" == "wild_restricted" {
+  di as result "PASS [wcbrestricted DiD: boot_type=wild_restricted]"
+}
+else {
+  di as error "FAIL [wcbrestricted DiD: boot_type=`e(boot_type)']"
+  local ++n_fail_r
+}
+
+// TEST: wcbrestricted seed makes results reproducible
+wsga did y m, sgroup(sgroup) unit(unit) time(time) treat(D) ///
+  noipsw bsreps(20) seed(42) wcbrestricted
+scalar _p0_r1 = e(p_g0)
+scalar _ci_r1 = e(ci_lb_g0)
+wsga did y m, sgroup(sgroup) unit(unit) time(time) treat(D) ///
+  noipsw bsreps(20) seed(42) wcbrestricted
+scalar _p0_r2 = e(p_g0)
+scalar _ci_r2 = e(ci_lb_g0)
+if abs(_p0_r1 - _p0_r2) < 1e-10 & abs(_ci_r1 - _ci_r2) < 1e-10 {
+  di as result "PASS [wcbrestricted DiD: seed reproducible]"
+}
+else {
+  di as error "FAIL [wcbrestricted DiD: seed reproducibility broken]"
+  local ++n_fail_r
+}
+
+// TEST: wcbrestricted + nobootstrap rejected
+capture wsga did y m, sgroup(sgroup) unit(unit) time(time) treat(D) ///
+  noipsw nobootstrap wcbrestricted
+if _rc != 0 {
+  di as result "PASS [wcbrestricted DiD: nobootstrap rejected, rc=" _rc "]"
+}
+else {
+  di as error "FAIL [wcbrestricted DiD: nobootstrap should have errored]"
+  local ++n_fail_r
+}
+
+// TEST: wcbrestricted + wildcluster mutually exclusive
+capture wsga did y m, sgroup(sgroup) unit(unit) time(time) treat(D) ///
+  noipsw bsreps(10) seed(1) wildcluster wcbrestricted
+if _rc != 0 {
+  di as result "PASS [wcbrestricted+wildcluster DiD: mutually exclusive, rc=" _rc "]"
+}
+else {
+  di as error "FAIL [wcbrestricted+wildcluster DiD: should have errored]"
+  local ++n_fail_r
+}
+
+if `n_fail_r' == 0 {
+  di as result _newline "All wcbrestricted DiD smoke tests passed."
+}
+else {
+  di as error _newline "`n_fail_r' wcbrestricted DiD smoke test(s) FAILED."
+  exit 1
 }
