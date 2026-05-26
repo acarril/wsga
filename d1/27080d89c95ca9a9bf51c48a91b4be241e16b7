@@ -1,0 +1,19 @@
+stata/tests/smoke_rdd_wild.do
+  s_4b929bccf076dd::t_ed7fbda0064711 1,112,226
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "d127080d89c95ca9a9bf51c48a91b4be241e16b7",
+  "prompts": {},
+  "sessions": {
+    "s_4b929bccf076dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6947628-cd33-4583-be86-f617be7d520c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
