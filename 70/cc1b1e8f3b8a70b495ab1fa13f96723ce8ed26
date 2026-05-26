@@ -1,0 +1,45 @@
+stata/rddsga.sthlp
+  s_4ced74c89eca6e::t_c5f56470c70a66 2
+DESCRIPTION
+  s_4ced74c89eca6e::t_c5f56470c70a66 3
+stata/rddsga.pkg
+  s_4ced74c89eca6e::t_c5f56470c70a66 1
+NEWS.md
+  s_4ced74c89eca6e::t_c5f56470c70a66 3
+  s_4ced74c89eca6e::t_bd2e05f2c9c45e 5-27
+stata/wsga.ado
+  s_4ced74c89eca6e::t_c5f56470c70a66 1
+  s_4ced74c89eca6e::t_30536fc0a71e25 795-799
+  s_4ced74c89eca6e::t_cebc0bb062e99e 364,366-373
+  s_4ced74c89eca6e::t_c981a0a1237eb9 814-815,821
+stata/wsga.sthlp
+  s_4ced74c89eca6e::t_c5f56470c70a66 2
+stata/stata.toc
+  s_4ced74c89eca6e::t_c5f56470c70a66 1
+stata/wsga_did.sthlp
+  s_4ced74c89eca6e::t_c5f56470c70a66 2
+stata/tests/smoke_rdd_wild.do
+  s_4ced74c89eca6e::t_53d21bf0c9a16b 126-156
+stata/rddsga.ado
+  s_4ced74c89eca6e::t_c5f56470c70a66 1
+stata/wsga.pkg
+  s_4ced74c89eca6e::t_c5f56470c70a66 1
+stata/wsga_rdd.sthlp
+  s_4ced74c89eca6e::t_c5f56470c70a66 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "70cc1b1e8f3b8a70b495ab1fa13f96723ce8ed26",
+  "prompts": {},
+  "sessions": {
+    "s_4ced74c89eca6e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f55199a-b497-4daf-90b2-18a7c4110b6c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
