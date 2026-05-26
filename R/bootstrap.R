@@ -24,7 +24,7 @@ stratified_resample <- function(n, strata = NULL) {
 #'   cluster's stratum. If supplied, clusters are sampled with replacement
 #'   *within* each stratum.
 #' @return A vector of drawn cluster IDs, same length and type as
-#'   `unique_clusters`. Duplicates are expected — that's the whole point.
+#'   `unique_clusters`. Duplicates are expected -- that's the whole point.
 #' @noRd
 cluster_resample <- function(unique_clusters, cluster_strata = NULL) {
   if (is.null(cluster_strata)) return(sample(unique_clusters, replace = TRUE))
@@ -39,7 +39,7 @@ cluster_resample <- function(unique_clusters, cluster_strata = NULL) {
 
 #' Build a resampled dataset by replicating each drawn cluster's rows.
 #'
-#' Fresh-IDs recipe (Cameron–Gelbach–Miller): the cluster identifier column
+#' Fresh-IDs recipe (Cameron-Gelbach-Miller): the cluster identifier column
 #' is rewritten as `<orig_id>__d<j>` for the j-th draw, so a cluster drawn N
 #' times yields N distinct copies. Required for any downstream specification
 #' that uses cluster-level fixed effects (DiD); a no-op when there are no FE.
@@ -54,7 +54,7 @@ cluster_resample <- function(unique_clusters, cluster_strata = NULL) {
 #'   are also propagated to that column so unit FE remain identified when
 #'   two draws of the same cluster bring in overlapping units.
 #' @return A list with two elements:
-#'   - `data`: data frame with `length(drawn) × rows-per-cluster` rows.
+#'   - `data`: data frame with `length(drawn) x rows-per-cluster` rows.
 #'   - `orig_idx`: integer vector of the same length, where
 #'     `orig_idx[k]` is the row in the original `data` that the k-th
 #'     row of the resampled data came from. Used by the `fixed_ps`
@@ -91,7 +91,7 @@ build_cluster_rep_data <- function(data, cluster_var, cluster_ids, drawn,
 #'   `block_var`).
 #' - `cluster_var` set: pairs cluster bootstrap. Whole clusters are drawn
 #'   with replacement; each drawn cluster contributes all its rows; cluster
-#'   IDs are made unique per draw (Cameron–Gelbach–Miller). `block_var`, if
+#'   IDs are made unique per draw (Cameron-Gelbach-Miller). `block_var`, if
 #'   supplied, must be constant within `cluster_var` and is used to stratify
 #'   at the cluster level.
 #'
@@ -105,8 +105,8 @@ build_cluster_rep_data <- function(data, cluster_var, cluster_ids, drawn,
 #'   adapt: strata of rows when `cluster_var` is NULL, strata of clusters
 #'   otherwise.
 #' @param seed Optional integer RNG seed.
-#' @return A list with `draws`, `vcov`, `pval`, `ci`, `B_ok`, `failed`, and —
-#'   when `cluster_var` is set — `N_clusters`.
+#' @return A list with `draws`, `vcov`, `pval`, `ci`, `B_ok`, `failed`, and --
+#'   when `cluster_var` is set -- `N_clusters`.
 #' @noRd
 run_bootstrap <- function(run_one_rep, data, B, est,
                           cluster_var = NULL,
@@ -240,7 +240,8 @@ run_bootstrap <- function(run_one_rep, data, B, est,
 #' @noRd
 run_wild_bootstrap <- function(fit, X, y, w, active, cluster_vec,
                                coef_g0_name, coef_g1_name,
-                               B, seed = NULL) {
+                               B, seed = NULL,
+                               restricted = FALSE) {
   if (!is.null(seed)) set.seed(seed)
 
   # Restrict to active rows (the only rows that influenced the fit)
@@ -283,7 +284,7 @@ run_wild_bootstrap <- function(fit, X, y, w, active, cluster_vec,
   }
   cluster_idx <- match(as.character(c_a), as.character(unique_clusters))
 
-  # Cache QR of the weighted design -- refits are then a single qr.coef() call.
+  # Cache QR of the weighted unrestricted design -- each refit is one qr.coef().
   sqrt_w <- sqrt(w_a)
   X_w    <- sqrt_w * X_clean
   qr_X   <- qr(X_w)
@@ -291,26 +292,89 @@ run_wild_bootstrap <- function(fit, X, y, w, active, cluster_vec,
     stop("Wild cluster bootstrap: weighted design matrix is rank-deficient.")
   }
 
+  # WCB-R pre-computation: fit three restricted models and store their
+  # fitted values and residuals. Each restricted fit imposes one null hypothesis;
+  # the residuals are used to generate y* in the bootstrap loop.
+  if (restricted) {
+    .fit_restricted <- function(X_r, label) {
+      qr_r <- qr(sqrt_w * X_r)
+      if (qr_r$rank < ncol(X_r))
+        stop(sprintf("WCB-R: restricted design for %s is rank-deficient (thin subgroup?).", label))
+      beta_r <- qr.coef(qr_r, sqrt_w * y_a)
+      yhat_r <- as.numeric(X_r %*% beta_r)
+      list(yhat = yhat_r, resid = y_a - yhat_r)
+    }
+
+    # H0: G0_Z = 0  -- drop the G0 treatment column
+    r0 <- .fit_restricted(
+      X_clean[, non_aliased != coef_g0_name, drop = FALSE], "H0: G0_Z=0")
+
+    # H0: G1_Z = 0  -- drop the G1 treatment column
+    r1 <- .fit_restricted(
+      X_clean[, non_aliased != coef_g1_name, drop = FALSE], "H0: G1_Z=0")
+
+    # H0: G0_Z = G1_Z  -- merge both treatment columns into Z_pooled = G0_Z + G1_Z
+    other_cols <- non_aliased[non_aliased != coef_g0_name & non_aliased != coef_g1_name]
+    X_rdiff <- cbind(
+      Z_pooled = X_clean[, coef_g0_name] + X_clean[, coef_g1_name],
+      X_clean[, other_cols, drop = FALSE]
+    )
+    rdiff <- .fit_restricted(X_rdiff, "H0: G0_Z=G1_Z")
+
+    draws_r0    <- rep(NA_real_, B)
+    draws_r1    <- rep(NA_real_, B)
+    draws_rdiff <- rep(NA_real_, B)
+  }
+
   draws <- matrix(NA_real_, nrow = B, ncol = 2,
                   dimnames = list(NULL, c("g0", "g1")))
 
-  message(sprintf("Wild cluster bootstrap (%d):", B))
+  label <- if (restricted) "WCB-R" else "WCB-U"
+  message(sprintf("Wild cluster bootstrap (%s, %d):", label, B))
   for (i in seq_len(B)) {
-    signs   <- sample(c(-1, 1), N_clusters, replace = TRUE)
-    v       <- signs[cluster_idx]
-    y_star  <- y_hat + v * e
-    y_w     <- sqrt_w * y_star
-    beta_b  <- tryCatch(qr.coef(qr_X, y_w), error = function(e) NULL)
+    signs <- sample(c(-1, 1), N_clusters, replace = TRUE)
+    v     <- signs[cluster_idx]
+
+    # Unrestricted refit: draws used for CI and SE (same as plain WCB-U)
+    y_star <- y_hat + v * e
+    beta_b <- tryCatch(qr.coef(qr_X, sqrt_w * y_star), error = function(e) NULL)
     if (!is.null(beta_b)) {
       names(beta_b) <- non_aliased
       draws[i, "g0"] <- beta_b[[coef_g0_name]]
       draws[i, "g1"] <- beta_b[[coef_g1_name]]
     }
+
+    if (restricted) {
+      # Restricted refit for H0: G0_Z=0 -- draw of G0_Z used for p-value
+      b_r0 <- tryCatch(
+        qr.coef(qr_X, sqrt_w * (r0$yhat + v * r0$resid)), error = function(e) NULL)
+      if (!is.null(b_r0)) {
+        names(b_r0) <- non_aliased
+        draws_r0[i] <- b_r0[[coef_g0_name]]
+      }
+
+      # Restricted refit for H0: G1_Z=0 -- draw of G1_Z
+      b_r1 <- tryCatch(
+        qr.coef(qr_X, sqrt_w * (r1$yhat + v * r1$resid)), error = function(e) NULL)
+      if (!is.null(b_r1)) {
+        names(b_r1) <- non_aliased
+        draws_r1[i] <- b_r1[[coef_g1_name]]
+      }
+
+      # Restricted refit for H0: G0_Z=G1_Z -- draw of diff
+      b_rdiff <- tryCatch(
+        qr.coef(qr_X, sqrt_w * (rdiff$yhat + v * rdiff$resid)), error = function(e) NULL)
+      if (!is.null(b_rdiff)) {
+        names(b_rdiff) <- non_aliased
+        draws_rdiff[i] <- b_rdiff[[coef_g1_name]] - b_rdiff[[coef_g0_name]]
+      }
+    }
+
     if (i %% 10 == 0 || i == B) cat(sprintf("\r  %d/%d", i, B))
   }
   cat("\n")
 
-  ok       <- complete.cases(draws)
+  ok <- complete.cases(draws)
   if (any(!ok)) {
     warning(sprintf("%d of %d wild bootstrap replicates failed and were dropped.",
                     sum(!ok), B))
@@ -324,15 +388,34 @@ run_wild_bootstrap <- function(fit, X, y, w, active, cluster_vec,
                 g1 = beta_clean[[coef_g1_name]])
   est_all  <- c(est_all, diff = est_all[["g1"]] - est_all[["g0"]])
 
-  pval <- sapply(seq_len(3), function(g) {
-    cnt <- sum(abs(draws_ok[, g] - est_all[g]) >= abs(est_all[g]))
-    (1 + cnt) / (B_ok + 1)
-  })
-  names(pval) <- c("g0", "g1", "diff")
-
+  # CIs: empirical percentile from unrestricted draws (coauthor agreement)
   ci <- apply(draws_ok, 2, quantile, probs = c(0.025, 0.975))
   rownames(ci) <- c("lb", "ub")
 
-  list(draws = draws_ok, vcov = V_boot, pval = pval, ci = ci,
-       B_ok = B_ok, failed = sum(!ok), N_clusters = N_clusters)
+  if (restricted) {
+    # P-values from restricted draws: compare |draw| >= |est|, no recentering.
+    # Under H0 the restricted residuals are already centred at 0, so the
+    # bootstrap distribution is centred at 0 by construction (MacKinnon &
+    # Webb 2017, eq. 8).
+    ok_r0    <- !is.na(draws_r0)
+    ok_r1    <- !is.na(draws_r1)
+    ok_rdiff <- !is.na(draws_rdiff)
+    pval <- c(
+      g0   = (1 + sum(abs(draws_r0[ok_r0])       >= abs(est_all[["g0"]])))   / (sum(ok_r0)    + 1),
+      g1   = (1 + sum(abs(draws_r1[ok_r1])       >= abs(est_all[["g1"]])))   / (sum(ok_r1)    + 1),
+      diff = (1 + sum(abs(draws_rdiff[ok_rdiff])  >= abs(est_all[["diff"]]))) / (sum(ok_rdiff) + 1)
+    )
+    list(draws = draws_ok, vcov = V_boot, pval = pval, ci = ci,
+         B_ok = B_ok, failed = sum(!ok), N_clusters = N_clusters,
+         boot_type_pval = "wild_restricted", boot_type_ci = "wild")
+  } else {
+    # WCB-U: recentered formula (draws centred at est, not 0)
+    pval <- sapply(seq_len(3), function(g) {
+      cnt <- sum(abs(draws_ok[, g] - est_all[g]) >= abs(est_all[g]))
+      (1 + cnt) / (B_ok + 1)
+    })
+    names(pval) <- c("g0", "g1", "diff")
+    list(draws = draws_ok, vcov = V_boot, pval = pval, ci = ci,
+         B_ok = B_ok, failed = sum(!ok), N_clusters = N_clusters)
+  }
 }

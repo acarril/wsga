@@ -161,3 +161,80 @@ else {
   di as error _newline "`n_fail' smoke test(s) FAILED."
   exit 1
 }
+
+// -- TEST 11: wcbrestricted runs and posts boot_type=wild_restricted --
+capture wsga rdd Y, sgroup(G) running(X) bwidth(10) reducedform ///
+  bsreps(30) seed(1) noipsw cluster(clust) wcbrestricted
+if _rc != 0 {
+  di as error "FAIL [wcbrestricted: runs]: rc=" _rc
+  local ++n_fail
+}
+else if "`e(boot_type)'" == "wild_restricted" & e(N_clust) == 50 {
+  di as result "PASS [wcbrestricted: boot_type=wild_restricted, N_clust=50]"
+}
+else {
+  di as error "FAIL [wcbrestricted: boot_type=`e(boot_type)', N_clust=" e(N_clust) "]"
+  local ++n_fail
+}
+
+// -- TEST 12: wcbrestricted without cluster() rejected --
+capture wsga rdd Y, sgroup(G) running(X) bwidth(10) reducedform ///
+  bsreps(20) seed(1) noipsw wcbrestricted
+if _rc != 0 {
+  di as result "PASS [wcbrestricted-without-cluster rejected, rc=" _rc "]"
+}
+else {
+  di as error "FAIL [wcbrestricted-without-cluster should have errored]"
+  local ++n_fail
+}
+
+// -- TEST 13: wcbrestricted + nobootstrap rejected --
+capture wsga rdd Y, sgroup(G) running(X) bwidth(10) reducedform ///
+  noipsw cluster(clust) wcbrestricted nobootstrap
+if _rc != 0 {
+  di as result "PASS [wcbrestricted+nobootstrap rejected, rc=" _rc "]"
+}
+else {
+  di as error "FAIL [wcbrestricted+nobootstrap should have errored]"
+  local ++n_fail
+}
+
+// -- TEST 14: wildcluster + wcbrestricted mutually exclusive --
+capture wsga rdd Y, sgroup(G) running(X) bwidth(10) reducedform ///
+  bsreps(10) seed(1) noipsw cluster(clust) wildcluster wcbrestricted
+if _rc != 0 {
+  di as result "PASS [wildcluster+wcbrestricted mutually exclusive, rc=" _rc "]"
+}
+else {
+  di as error "FAIL [wildcluster+wcbrestricted should have errored]"
+  local ++n_fail
+}
+
+// -- TEST 15: wcbrestricted seed makes results reproducible --
+wsga rdd Y, sgroup(G) running(X) bwidth(10) reducedform ///
+  bsreps(30) seed(42) noipsw cluster(clust) wcbrestricted
+scalar _p0_run1 = e(p_g0)
+scalar _ci_run1 = e(ci_lb_g0)
+
+wsga rdd Y, sgroup(G) running(X) bwidth(10) reducedform ///
+  bsreps(30) seed(42) noipsw cluster(clust) wcbrestricted
+scalar _p0_run2 = e(p_g0)
+scalar _ci_run2 = e(ci_lb_g0)
+
+if abs(_p0_run1 - _p0_run2) < 1e-10 & abs(_ci_run1 - _ci_run2) < 1e-10 {
+  di as result "PASS [wcbrestricted seed: p-val and CI reproducible]"
+}
+else {
+  di as error "FAIL [wcbrestricted seed reproducibility broken]"
+  di "  p0 diff: " abs(_p0_run1 - _p0_run2)
+  di "  ci diff: " abs(_ci_run1 - _ci_run2)
+  local ++n_fail
+}
+
+if `n_fail' == 0 {
+  di as result _newline "All wsga rdd wildcluster smoke tests passed."
+}
+else {
+  di as error _newline "`n_fail' smoke test(s) FAILED."
+  exit 1
+}
