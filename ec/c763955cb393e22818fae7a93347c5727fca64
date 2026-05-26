@@ -1,0 +1,21 @@
+inst/run_simulations.R
+  s_4b929bccf076dd::t_e8b062f8a1107f 158,162-168,176,183-186
+  s_4b929bccf076dd::t_5c4fe2d9d896b4 76-98,104
+  s_4b929bccf076dd::t_a08361da1b50f7 332-334
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "ecc763955cb393e22818fae7a93347c5727fca64",
+  "prompts": {},
+  "sessions": {
+    "s_4b929bccf076dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6947628-cd33-4583-be86-f617be7d520c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
