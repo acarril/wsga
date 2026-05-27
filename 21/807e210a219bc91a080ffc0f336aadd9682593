@@ -1,0 +1,26 @@
+inst/simulation_report.qmd
+  s_4b929bccf076dd::t_9eb58910a2adc5 1-2,4-54,56-96,99-105,107-141,143-154,157-193,195-197,199-205,207-219,221-228,230-235,237-260,262-268,271-273,275-283,285-290,292-308,310-336,338,340-357,359-365,367-387,389-393,395,397-398,400-419,442-469
+  s_4b929bccf076dd::t_b105e109031e4a 142
+  s_4b929bccf076dd::t_8db4ffde748f72 3,55,97-98,106,155-156,194,198,206,220,229,236,261,269-270,274,284,291,309,337,339,358,366,388,394,396,399
+  s_4b929bccf076dd::t_178312169e4f05 420-441
+inst/simulation_report.html
+  s_4b929bccf076dd::t_e53c30a39a23ca 1-3333
+.Rbuildignore
+  s_4b929bccf076dd::t_c17d3d60a85322 8-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "21807e210a219bc91a080ffc0f336aadd9682593",
+  "prompts": {},
+  "sessions": {
+    "s_4b929bccf076dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6947628-cd33-4583-be86-f617be7d520c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
