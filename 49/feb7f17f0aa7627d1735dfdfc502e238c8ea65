@@ -1,0 +1,23 @@
+simulation/simulation_report.qmd
+  s_4b929bccf076dd::t_c759bb35d6d8f6 87-90
+  s_4b929bccf076dd::t_f929069f20871b 4
+  s_4b929bccf076dd::t_3026d1363ca6a2 458-461
+simulation/simulation_report.html
+  s_4b929bccf076dd::t_c311ec1982b6e0 9,2380-2385,2432,2488,2908
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "49feb7f17f0aa7627d1735dfdfc502e238c8ea65",
+  "prompts": {},
+  "sessions": {
+    "s_4b929bccf076dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6947628-cd33-4583-be86-f617be7d520c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
