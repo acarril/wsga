@@ -6,6 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
+<meta name="author" content="Alvaro Carril">
 <meta name="dcterms.date" content="2026-05-27">
 
 <title>Weighted Subgroup Analysis</title>
@@ -2376,6 +2377,12 @@ window.Quarto = {
 
 <div class="quarto-title-meta">
 
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Alvaro Carril </p>
+          </div>
+  </div>
     
     <div>
     <div class="quarto-title-meta-heading">Published</div>
@@ -2422,11 +2429,7 @@ window.Quarto = {
 <span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.caption      =</span> <span class="fu">element_text</span>(<span class="at">colour =</span> <span class="st">&quot;grey50&quot;</span>, <span class="at">size =</span> <span class="fu">rel</span>(<span class="fl">0.78</span>),</span>
 <span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>                                     <span class="at">hjust =</span> <span class="dv">0</span>, <span class="at">margin =</span> <span class="fu">margin</span>(<span class="at">t =</span> <span class="dv">8</span>))</span>
 <span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a><span class="co"># Beta_M labeller</span></span>
-<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>bm_lab <span class="ot">&lt;-</span> <span class="cf">function</span>(x) <span class="fu">paste0</span>(<span class="st">&quot;beta_M = &quot;</span>, x)</span>
-<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>n_lab  <span class="ot">&lt;-</span> <span class="cf">function</span>(x) <span class="fu">paste0</span>(<span class="st">&quot;n = &quot;</span>, x)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
 <section id="overview" class="level2" data-number="1">
@@ -2482,7 +2485,7 @@ y_i = \underbrace{\bigl(2 + \beta_M M_i\bigr) Z_i (1 - G_i)}_{\text{G=0 treatmen
 </tr>
 </tbody>
 </table>
-<p><strong>True per-group RD effects</strong>: <span class="math inline">\(b_{G=0} = 2\)</span>, <span class="math inline">\(b_{G=1} = 2 + \beta_G\)</span>. <strong>True differential</strong>: <span class="math inline">\(\Delta = \beta_G = 2\)</span> (held fixed throughout).</p>
+<p><strong>True per-group RD effects</strong>: <span class="math inline">\(b_{G=0} = 2\)</span>, <span class="math inline">\(b_{G=1} = 2 + \beta_G\)</span>. <strong>True differential</strong>: <span class="math inline">\(\Delta = \beta_G\)</span>, set per scenario: <span class="math inline">\(\Delta = 2\)</span> for the bias and unobservable scenarios (S1, S4), <span class="math inline">\(\Delta = 0\)</span> for the size scenario (S2), <span class="math inline">\(\Delta = 0.5\)</span> for the power scenario (S3).</p>
 <p>The key feature is that <span class="math inline">\(M\)</span> amplifies the <em>treatment response</em> (it multiplies <span class="math inline">\(Z\)</span>, not just <span class="math inline">\(y\)</span>). This means the within-group RD estimate for <span class="math inline">\(G=1\)</span> picks up <span class="math inline">\(\beta_M \cdot E[M \mid G=1] = \beta_M \delta\)</span>, creating a bias of <span class="math inline">\(\beta_M \delta\)</span> in the naive cross-subgroup comparison. IPW (WSGA) removes this bias by reweighting <span class="math inline">\(M\)</span> to the same distribution across groups.</p>
 <p>Two estimators are compared throughout:</p>
 <ul>
@@ -2902,7 +2905,7 @@ y_i = \underbrace{\bigl(2 + \beta_M M_i\bigr) Z_i (1 - G_i)}_{\text{G=0 treatmen
 <li>Those same moderators amplify the treatment response (<span class="math inline">\(\beta_M &gt; 0\)</span>).</li>
 <li>Omitting them would distort the cross-subgroup comparison.</li>
 </ol>
-<p>When neither condition holds, WSGA pays an IPW variance cost for no bias benefit. The simulation provides a rough guide: size distortion becomes serious around <span class="math inline">\(\delta \ge 0.5\)</span> with <span class="math inline">\(\beta_M = 0.3\)</span>; at <span class="math inline">\(\delta = 1,\, \beta_M = 0.5\)</span> the naive estimator has RMSE twice that of WSGA at <span class="math inline">\(n = 600\)</span>.</p>
+<p>When neither condition holds, WSGA pays an IPW variance cost for no bias benefit. The simulation provides a rough guide: size distortion becomes serious around <span class="math inline">\(\delta \ge 1\)</span> with <span class="math inline">\(\beta_M = 0.3\)</span> (naive rejection rate <span class="math inline">\(\approx 22\%\)</span> at <span class="math inline">\(\delta = 1\)</span>, <span class="math inline">\(66\%\)</span> at <span class="math inline">\(\delta = 2\)</span>); at <span class="math inline">\(\delta = 1,\, \beta_M = 0.5\)</span> the naive estimator has RMSE roughly <span class="math inline">\(1.5\times\)</span> that of WSGA at <span class="math inline">\(n = 600\)</span>.</p>
 </div>
 </div>
 <div class="callout callout-style-default callout-note callout-titled">

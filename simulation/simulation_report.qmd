@@ -1,6 +1,7 @@
 ---
 title: "Weighted Subgroup Analysis"
 subtitle: "Monte Carlo Simulation Evidence -- RDD Path"
+author: "Alvaro Carril"
 date: today
 format:
   html:
@@ -51,9 +52,6 @@ theme_sim <- function(base = 13) {
   )
 }
 
-# Beta_M labeller
-bm_lab <- function(x) paste0("beta_M = ", x)
-n_lab  <- function(x) paste0("n = ", x)
 ```
 
 ## Overview
@@ -86,7 +84,10 @@ $$
 : {tbl-colwidths="[38,28,34]"}
 
 **True per-group RD effects**: $b_{G=0} = 2$, $b_{G=1} = 2 + \beta_G$.
-**True differential**: $\Delta = \beta_G = 2$ (held fixed throughout).
+**True differential**: $\Delta = \beta_G$, set per scenario:
+$\Delta = 2$ for the bias and unobservable scenarios (S1, S4),
+$\Delta = 0$ for the size scenario (S2),
+$\Delta = 0.5$ for the power scenario (S3).
 
 The key feature is that $M$ amplifies the *treatment response* (it multiplies
 $Z$, not just $y$).  This means the within-group RD estimate for $G=1$ picks
@@ -454,9 +455,10 @@ Use WSGA when:
 
 When neither condition holds, WSGA pays an IPW variance cost for no
 bias benefit.  The simulation provides a rough guide: size distortion
-becomes serious around $\delta \ge 0.5$ with $\beta_M = 0.3$; at
-$\delta = 1,\, \beta_M = 0.5$ the naive estimator has RMSE twice that of
-WSGA at $n = 600$.
+becomes serious around $\delta \ge 1$ with $\beta_M = 0.3$
+(naive rejection rate $\approx 22\%$ at $\delta = 1$, $66\%$ at $\delta = 2$);
+at $\delta = 1,\, \beta_M = 0.5$ the naive estimator has RMSE roughly
+$1.5\times$ that of WSGA at $n = 600$.
 :::
 
 ::: {.callout-note}
