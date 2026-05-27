@@ -1,4 +1,4 @@
-*! 1.3.1 Alvaro Carril 2026-05-26
+*! 1.3.2 Alvaro Carril 2026-05-27
 
 // -- Dispatcher ----------------------------------------------------------------
 program define wsga

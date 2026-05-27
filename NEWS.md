@@ -1,14 +1,29 @@
 # wsga (R package) NEWS
 
+## wsga 1.3.2 (2026-05-27)
+
+### Documentation
+
+- Correct stale `inst/` path references in the 1.3.1 NEWS entry. The
+  Monte Carlo simulation files were moved from `inst/` to a top-level
+  `simulation/` directory in a follow-up commit on the same PR (`inst/`
+  semantics are for files that ship with the installed package, which
+  these never were since they were `.Rbuildignore`-d). NEWS now points
+  at the correct paths.
+
+---
+
 ## wsga 1.3.1 (2026-05-26)
 
 ### Internal
 
-- Add Monte Carlo simulation study (`inst/run_simulations.R`) validating
-  four core estimator properties: bias removal (S1), size control under
-  the null (S2), power as a function of K moderators (S3), and sensitivity
-  to unobservable confounding (S4). Full results (1000 reps, 10 cores)
-  saved to `inst/simulation_results/*.csv`. Closes #29.
+- Add Monte Carlo simulation study (`simulation/run_simulations.R`)
+  validating four core estimator properties: bias removal (S1), size
+  control under the null (S2), power as a function of K moderators (S3),
+  and sensitivity to unobservable confounding (S4). Full results
+  (1000 reps, 10 cores) saved to `simulation/simulation_results/*.csv`.
+  A self-contained Quarto report rendering all four scenarios with plots
+  is at `simulation/simulation_report.html`. Closes #29.
 
 ---
 
