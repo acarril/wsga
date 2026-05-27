@@ -1,0 +1,24 @@
+.Rbuildignore
+  s_4b929bccf076dd::t_37aaba00761179 6
+simulation/simulation_report.qmd
+  s_4b929bccf076dd::t_1f90331892e163 467
+simulation/run_simulations.R
+  s_4b929bccf076dd::t_330af289d2fb9f 11,33
+  s_4b929bccf076dd::t_1f90331892e163 15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "3d5b411b059b6869319ebf34bb455a1cbcdc2532",
+  "prompts": {},
+  "sessions": {
+    "s_4b929bccf076dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6947628-cd33-4583-be86-f617be7d520c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
