@@ -5,3 +5,5 @@
 ^\.claude$
 ^inst/run_simulations\.R$
 ^inst/simulation_results$
+^inst/simulation_report\.qmd$
+^inst/simulation_report\.html$

@@ -1,0 +1,469 @@
+---
+title: "Weighted Subgroup Analysis"
+subtitle: "Monte Carlo Simulation Evidence -- RDD Path"
+date: today
+format:
+  html:
+    theme: flatly
+    code-fold: true
+    code-summary: "Show code"
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    embed-resources: true
+    fig-width: 8
+    fig-height: 4.5
+    number-sections: true
+execute:
+  echo: true
+  warning: false
+  message: false
+  execute-dir: file
+---
+
+```{r setup}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(scales)
+
+# Results directory (relative to this file)
+RES <- "simulation_results"
+
+# Shared aesthetics
+PAL <- c(Naive = "#c0392b", WSGA = "#2980b9", `Full saturation` = "#27ae60")
+LTY <- c(Naive = "dashed",  WSGA = "solid",   `Full saturation` = "dotted")
+
+theme_sim <- function(base = 13) {
+  theme_minimal(base_size = base) +
+  theme(
+    panel.grid.minor  = element_blank(),
+    panel.grid.major  = element_line(colour = "grey92"),
+    strip.background  = element_rect(fill = "#f0f0f0", colour = NA),
+    strip.text        = element_text(face = "bold", size = rel(0.95)),
+    legend.position   = "bottom",
+    legend.title      = element_blank(),
+    plot.title        = element_text(face = "bold"),
+    plot.subtitle     = element_text(colour = "grey40", size = rel(0.9)),
+    axis.title        = element_text(size = rel(0.9)),
+    plot.caption      = element_text(colour = "grey50", size = rel(0.78),
+                                     hjust = 0, margin = margin(t = 8))
+  )
+}
+
+# Beta_M labeller
+bm_lab <- function(x) paste0("beta_M = ", x)
+n_lab  <- function(x) paste0("n = ", x)
+```
+
+## Overview
+
+This document reports four Monte Carlo scenarios that validate the core
+statistical properties of `wsga` for **sharp regression discontinuity (RD)**
+designs.  All scenarios use the same underlying data-generating process (DGP)
+and are run with $R = 1{,}000$ replications per cell.  The script that
+produced these results lives at `inst/run_simulations.R`.
+
+## Data-generating process {#sec-dgp}
+
+The DGP is a sharp RD with one observable moderator $M$ that is
+imbalanced across subgroups:
+
+$$
+y_i = \underbrace{\bigl(2 + \beta_M M_i\bigr) Z_i (1 - G_i)}_{\text{G=0 treatment response}}
+    + \underbrace{\bigl(2 + \beta_G + \beta_M M_i\bigr) Z_i G_i}_{\text{G=1 treatment response}}
+    + 0.3\, x_i (1-G_i) + 0.5\, x_i G_i + \varepsilon_i
+$$
+
+| Symbol | Distribution | Role |
+|--------|-------------|------|
+| $x_i$  | $U(-1,1)$   | Running variable |
+| $Z_i = \mathbf{1}[x_i \ge 0]$ | Sharp | Treatment assignment |
+| $G_i$  | $\text{Bern}(0.5)$ | Binary subgroup |
+| $M_i = \delta G_i + \varepsilon_M$ | $\varepsilon_M \sim N(0,1)$ | Moderator (imbalanced by $\delta$) |
+| $\varepsilon_i$ | $N(0, 0.25)$ | Idiosyncratic noise |
+
+**True per-group RD effects**: $b_{G=0} = 2$, $b_{G=1} = 2 + \beta_G$.
+**True differential**: $\Delta = \beta_G = 2$ (held fixed throughout).
+
+The key feature is that $M$ amplifies the *treatment response* (it multiplies
+$Z$, not just $y$).  This means the within-group RD estimate for $G=1$ picks
+up $\beta_M \cdot E[M \mid G=1] = \beta_M \delta$, creating a bias of
+$\beta_M \delta$ in the naive cross-subgroup comparison.  IPW (WSGA)
+removes this bias by reweighting $M$ to the same distribution across groups.
+
+Two estimators are compared throughout:
+
+- **Naive** -- `wsga_rdd(y ~ 1 | G, noipsw = TRUE)`: no adjustment for $M$.
+- **WSGA** -- `wsga_rdd(y ~ 1 | G, balance = ~ M, noipsw = FALSE)`: $M$ enters
+  the propensity score only; outcome regression remains lean.
+
+Both use analytical inference (no bootstrap) for speed, except Scenario 1b
+which uses the pairs bootstrap to assess coverage.
+
+---
+
+## Scenario 1 -- Bias removal {#sec-bias}
+
+**Design**: sweep $\delta \in \{0, 0.5, 1, 2\}$ and
+$\beta_M \in \{0, 0.3, 0.5\}$ at $n \in \{300, 600, 1500\}$.
+Report **bias** (mean estimate $- \Delta$) and **RMSE**.
+
+**Prediction**: naive bias $\approx \beta_M \delta$; WSGA bias $\approx 0$.
+
+```{r s1-load}
+s1 <- read.csv(file.path(RES, "s1_bias_rmse.csv")) |>
+  mutate(
+    beta_M_lab = factor(paste0("beta[M] == ", beta_M),
+                        levels = paste0("beta[M] == ", sort(unique(beta_M)))),
+    n_lab = factor(paste0("n = ", n), levels = paste0("n = ", sort(unique(n))))
+  )
+```
+
+### Bias {.unnumbered}
+
+```{r s1-bias-plot, fig.height=5}
+s1_long <- s1 |>
+  select(n, delta, beta_M, beta_M_lab, n_lab, bias_naive, bias_wsga) |>
+  pivot_longer(c(bias_naive, bias_wsga),
+               names_to = "method", values_to = "bias") |>
+  mutate(method = recode(method, bias_naive = "Naive", bias_wsga = "WSGA"))
+
+# Theoretical naive bias line
+theory <- s1 |>
+  select(n, delta, beta_M, beta_M_lab, n_lab) |>
+  distinct() |>
+  mutate(theory = beta_M * delta)
+
+ggplot(s1_long |> filter(n == 600),
+       aes(x = delta, y = bias, colour = method, linetype = method)) +
+  geom_hline(yintercept = 0, colour = "grey50", linewidth = 0.4) +
+  geom_line(data = theory |> filter(n == 600),
+            aes(x = delta, y = theory, group = beta_M_lab),
+            colour = "grey60", linetype = "dotted", linewidth = 0.8,
+            inherit.aes = FALSE) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2.5) +
+  facet_wrap(~ beta_M_lab, labeller = label_parsed, nrow = 1) +
+  scale_colour_manual(values = PAL) +
+  scale_linetype_manual(values = LTY) +
+  scale_x_continuous(breaks = c(0, 0.5, 1, 2)) +
+  labs(
+    title    = "Scenario 1: Bias in the differential effect estimate",
+    subtitle = "n = 600  |  1000 replications  |  dotted line = theoretical naive bias",
+    x        = expression(delta ~ "(moderator imbalance)"),
+    y        = "Bias (mean estimate - true)",
+    caption  = "WSGA residual bias at delta = 2 reflects IPW weight variance under extreme imbalance."
+  ) +
+  theme_sim()
+```
+
+The naive estimator's bias grows almost exactly linearly with
+$\beta_M \cdot \delta$ (confirmed by the dotted theoretical line).  WSGA
+removes nearly all of it; the small residual at $\delta = 2$ reflects IPW
+weight variance when propensity scores are extreme.
+
+### RMSE {.unnumbered}
+
+```{r s1-rmse-plot}
+s1_rmse <- s1 |>
+  select(n, delta, beta_M, beta_M_lab, n_lab, rmse_naive, rmse_wsga) |>
+  pivot_longer(c(rmse_naive, rmse_wsga),
+               names_to = "method", values_to = "rmse") |>
+  mutate(method = recode(method, rmse_naive = "Naive", rmse_wsga = "WSGA"))
+
+ggplot(s1_rmse |> filter(n == 600),
+       aes(x = delta, y = rmse, colour = method, linetype = method)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2.5) +
+  facet_wrap(~ beta_M_lab, labeller = label_parsed, nrow = 1) +
+  scale_colour_manual(values = PAL) +
+  scale_linetype_manual(values = LTY) +
+  scale_x_continuous(breaks = c(0, 0.5, 1, 2)) +
+  labs(
+    title    = "Scenario 1: Root mean squared error",
+    subtitle = "n = 600  |  1000 replications",
+    x        = expression(delta ~ "(moderator imbalance)"),
+    y        = "RMSE"
+  ) +
+  theme_sim()
+```
+
+When $\beta_M = 0$ WSGA's RMSE slightly exceeds naive (IPW weight variance with
+no bias to correct).  Once confounding is present ($\beta_M > 0$) WSGA
+dominates -- it trades a small efficiency cost for large bias reduction.
+
+---
+
+## Scenario 1b -- Bootstrap coverage {#sec-coverage}
+
+**Design**: 500 reps of WSGA with pairs bootstrap ($B = 100$) at
+$\delta \in \{0, 1\}$, $\beta_M = 0.3$, $n \in \{300, 600, 1500\}$.
+Target: 95% CI empirical coverage.
+
+```{r s1b-plot, fig.height=3.8}
+s1b <- read.csv(file.path(RES, "s1_coverage.csv")) |>
+  mutate(delta_lab = paste0("delta = ", delta))
+
+ggplot(s1b, aes(x = factor(n), y = coverage, colour = delta_lab,
+                group = delta_lab)) +
+  geom_hline(yintercept = 0.95, colour = "grey50", linetype = "dashed",
+             linewidth = 0.6) +
+  geom_line(linewidth = 0.9) +
+  geom_point(size = 3.5) +
+  annotate("text", x = 0.6, y = 0.952, label = "Nominal 0.95",
+           colour = "grey40", size = 3.5, hjust = 0) +
+  scale_y_continuous(limits = c(0.89, 0.97), labels = percent_format(1)) +
+  scale_colour_manual(values = c("#16a085", "#8e44ad")) +
+  labs(
+    title    = "Scenario 1b: Empirical 95% CI coverage (WSGA, pairs bootstrap)",
+    subtitle = "500 reps  |  B = 100 bootstrap replications  |  beta_M = 0.3",
+    x        = "Sample size n",
+    y        = "Empirical coverage",
+    caption  = "Slight under-coverage is expected at B = 100; tightens with larger n."
+  ) +
+  theme_sim() +
+  theme(legend.title = element_text())
+```
+
+Coverage is 0.918-0.944 across all cells -- modest under-coverage typical of
+bootstrap CIs at $B = 100$.  Coverage is not sensitive to the imbalance
+level $\delta$, suggesting the bias is adequately removed before the
+bootstrap runs.
+
+---
+
+## Scenario 2 -- Size control {#sec-size}
+
+**Design**: true differential $\Delta = 0$ (null); sweep
+$\delta \in \{0, 0.5, 1, 2\}$ and $\beta_M \in \{0, 0.3\}$ at $n = 600$.
+Report the 5%-level rejection rate.
+
+**Prediction**: naive over-rejects when $\delta > 0$ and $\beta_M > 0$;
+WSGA maintains nominal size.
+
+```{r s2-plot, fig.height=4.5}
+s2 <- read.csv(file.path(RES, "s2_size.csv")) |>
+  mutate(beta_M_lab = factor(paste0("beta[M] == ", beta_M),
+                              levels = paste0("beta[M] == ", sort(unique(beta_M)))))
+
+s2_long <- s2 |>
+  pivot_longer(c(size_naive, size_wsga),
+               names_to = "method", values_to = "size") |>
+  mutate(method = recode(method, size_naive = "Naive", size_wsga = "WSGA"))
+
+ggplot(s2_long |> filter(n == 600),
+       aes(x = delta, y = size, colour = method, linetype = method)) +
+  geom_hline(yintercept = 0.05, colour = "grey50", linetype = "dashed",
+             linewidth = 0.6) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2.5) +
+  annotate("text", x = 0.05, y = 0.053, label = "Nominal alpha = 0.05",
+           colour = "grey40", size = 3.5, hjust = 0) +
+  facet_wrap(~ beta_M_lab, labeller = label_parsed, nrow = 1) +
+  scale_colour_manual(values = PAL) +
+  scale_linetype_manual(values = LTY) +
+  scale_x_continuous(breaks = c(0, 0.5, 1, 2)) +
+  scale_y_continuous(labels = percent_format(1)) +
+  labs(
+    title    = "Scenario 2: Rejection rate under the null (Delta = 0)",
+    subtitle = "n = 600  |  1000 replications  |  nominal alpha = 0.05",
+    x        = expression(delta ~ "(moderator imbalance)"),
+    y        = "Rejection rate",
+    caption  = paste0(
+      "WSGA mild inflation at (delta = 2, beta_M = 0) reflects IPW weight variance ",
+      "when there is no confounding to correct."
+    )
+  ) +
+  theme_sim()
+```
+
+The size distortion of the naive estimator is dramatic: at
+$(\delta = 1,\, \beta_M = 0.3)$ naive rejects 21.7% of nulls at the 5%
+level; at $(\delta = 2,\, \beta_M = 0.3)$ it reaches 65.8%.  WSGA holds
+close to 5% throughout -- the notable exception is at $(\delta = 2,\, \beta_M = 0)$
+where IPW reweighting is unnecessary but still adds weight variance,
+inflating size to 12.9%.  This is a meaningful caveat: when there is no
+confounding, WSGA is not the right tool.
+
+---
+
+## Scenario 3 -- Power as a function of K {#sec-power}
+
+**Design**: $K \in \{0, 1, 2, 4, 6, 8\}$ continuous moderators
+($M_k \sim N(0.4\, G, 1)$) with no direct effect on $y$.  True
+$\Delta = 0.5$.  Three estimators:
+
+| Estimator | Outcome formula | Propensity score |
+|-----------|-----------------|------------------|
+| Naive     | `y ~ 1 \| G`   | None (noipsw)    |
+| WSGA      | `y ~ 1 \| G`   | $M_1 + \ldots + M_K$ |
+| Full saturation | `y ~ M1 + ... + MK \| G` | None (noipsw) |
+
+Full saturation adds $2K$ df to the outcome regression;
+WSGA adds $K$ logit parameters to the propensity score but keeps the
+outcome lean.
+
+> **Note on the comparison.** The Calonico et al. "full saturation"
+> approach cells on all $2^K$ moderator combinations, adding $2^K$
+> parameters -- far more than the $2K$ in our linear-covariate proxy.
+> With $K = 8$ and $n = 600$, $2^8 = 256$ cells average fewer than 2.5
+> observations each, making the approach infeasible.  We show the
+> linear-covariate proxy as the most optimistic comparator available in
+> this framework.
+
+```{r s3-plot, fig.height=5}
+s3 <- read.csv(file.path(RES, "s3_power_vs_K.csv")) |>
+  mutate(n_lab = factor(paste0("n = ", n), levels = paste0("n = ", sort(unique(n)))))
+
+s3_long <- s3 |>
+  pivot_longer(c(power_naive, power_wsga, power_full),
+               names_to = "method", values_to = "power") |>
+  mutate(method = recode(method,
+    power_naive = "Naive",
+    power_wsga  = "WSGA",
+    power_full  = "Full saturation"))
+
+ggplot(s3_long, aes(x = K, y = power, colour = method, linetype = method)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2.5) +
+  facet_wrap(~ n_lab, nrow = 1) +
+  scale_colour_manual(values = PAL) +
+  scale_linetype_manual(values = LTY) +
+  scale_x_continuous(breaks = c(0, 1, 2, 4, 6, 8)) +
+  scale_y_continuous(labels = percent_format(1), limits = c(0, 1)) +
+  labs(
+    title    = "Scenario 3: Power vs number of moderators K",
+    subtitle = "1000 replications  |  Delta = 0.5  |  moderators have no direct effect on y",
+    x        = "Number of moderators K",
+    y        = "Rejection rate (true Delta = 0.5, alpha = 0.05)",
+    caption  = paste0(
+      "WSGA pays an IPW weight variance cost as K grows. ",
+      "Full saturation (linear 2K df) stays near naive with this DGP because ",
+      "moderators add no residual variance reduction. ",
+      "Cell-splitting (2^K parameters) would collapse far faster."
+    )
+  ) +
+  theme_sim()
+```
+
+With no direct $y$-effect from the moderators, full saturation's 2K df
+overhead is small relative to sample size, so its power barely moves.
+WSGA's power declines more noticeably because the propensity score model
+with K continuous moderators creates IPW weight variance even when the
+weights are not needed to remove bias.
+
+The honest take-away from S3 is that **WSGA's power advantage over full
+saturation materialises when the Calonico et al. cell-splitting is the
+correct comparator** -- where each additional moderator multiplies the
+required cell count by two.  The linear-covariate proxy shown here is
+the most favourable comparator, and even then WSGA loses on raw power
+when confounding is absent.  Its value rests on S1 and S2: unbiasedness
+and size control under confounding, at a modest but non-zero power cost.
+
+---
+
+## Scenario 4 -- Sensitivity to unobservable confounding {#sec-unobs}
+
+**Design**: unobservable $U = \gamma G + \varepsilon_U$ ($\varepsilon_U \sim N(0,1)$,
+independent of $M$) amplifies the treatment response via $U \cdot Z$.
+Sweep $\gamma \in \{0, 0.25, 0.5, 1, 2\}$ at $n \in \{600, 1500\}$.
+WSGA controls for $M$ but cannot observe $U$.
+
+**Prediction**: residual bias $\approx \gamma$ (the $G$-correlated component
+of $U$ that IPW cannot reach).
+
+```{r s4-plot, fig.height=4.5}
+s4 <- read.csv(file.path(RES, "s4_unobservable.csv")) |>
+  mutate(n_lab = factor(paste0("n = ", n), levels = paste0("n = ", sort(unique(n)))))
+
+# Reference line: y = gamma (theoretical residual bias if WSGA perfectly removes M-bias)
+ref <- data.frame(gamma = c(0, 2), bias = c(0, 2))
+
+ggplot(s4, aes(x = gamma, y = bias_wsga, colour = n_lab, group = n_lab)) +
+  geom_abline(slope = 1, intercept = 0, colour = "grey55", linetype = "dashed",
+              linewidth = 0.7) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 3) +
+  annotate("text", x = 1.62, y = 1.5, label = "bias = gamma (theoretical)",
+           colour = "grey45", size = 3.5, angle = 42) +
+  scale_colour_manual(values = c(`n = 600` = "#e67e22", `n = 1500` = "#16a085")) +
+  scale_x_continuous(breaks = c(0, 0.25, 0.5, 1, 2)) +
+  labs(
+    title    = "Scenario 4: Residual bias from unobservable confounding",
+    subtitle = "1000 replications  |  delta = 1, beta_M = 0.3",
+    x        = expression(gamma ~ "(unobservable amplification strength)"),
+    y        = "WSGA bias (mean estimate - true Delta)",
+    caption  = paste0(
+      "Small offset above the diagonal (~0.04 at n = 600, ~0.03 at n = 1500) ",
+      "is residual from the observable M-confounding at delta = 1."
+    )
+  ) +
+  theme_sim() +
+  theme(legend.title = element_text(size = rel(0.9)))
+```
+
+The bias grows almost perfectly linearly with $\gamma$.  The small offset
+above the $\text{bias} = \gamma$ diagonal is the residual from the
+observable confounding ($\delta = 1,\, \beta_M = 0.3$) that WSGA does
+not fully remove at finite $n$.  This residual shrinks with $n$,
+consistent with IPW consistency.  The practical implication: Assumption 4
+(no unobservable treatment-response confounders correlated with $G$) is
+load-bearing, and the simulation quantifies exactly how fast the bias
+accumulates when it fails.
+
+---
+
+## Summary {#sec-summary}
+
+```{r summary-table}
+knitr::kable(
+  data.frame(
+    Scenario = c("S1 Bias removal", "S1b Bootstrap coverage",
+                 "S2 Size control", "S3 Power vs K", "S4 Unobservables"),
+    `Key result` = c(
+      "Naive bias = beta_M x delta; WSGA near-zero",
+      "0.92-0.94 (nominal 0.95); stable across delta",
+      "Naive rejects 22%-66% under the null; WSGA holds at ~5%",
+      "Naive power flat; WSGA declines with K (IPW cost)",
+      "Residual bias grows linearly with gamma"
+    ),
+    `Limitation / caveat` = c(
+      "Small residual at delta = 2 from IPW weight variance",
+      "Mild under-coverage at B = 100; improves with larger B",
+      "WSGA size inflated at (delta = 2, beta_M = 0) when IPW is unnecessary",
+      "Full saturation (linear 2K df) stays near naive in this DGP",
+      "Assumption 4 is load-bearing; no remedy within the model"
+    ),
+    check.names = FALSE
+  ),
+  col.names = c("Scenario", "Key result", "Limitation / caveat")
+)
+```
+
+::: {.callout-tip}
+## When to use WSGA
+
+Use WSGA when:
+
+1. Observable moderators predict subgroup membership ($\delta > 0$).
+2. Those same moderators amplify the treatment response ($\beta_M > 0$).
+3. Omitting them would distort the cross-subgroup comparison.
+
+When neither condition holds, WSGA pays an IPW variance cost for no
+bias benefit.  The simulation provides a rough guide: size distortion
+becomes serious around $\delta \ge 0.5$ with $\beta_M = 0.3$; at
+$\delta = 1,\, \beta_M = 0.5$ the naive estimator has RMSE twice that of
+WSGA at $n = 600$.
+:::
+
+::: {.callout-note}
+## Reproducibility
+
+```r
+# From the package root:
+Rscript inst/run_simulations.R           # full run (~12 min, 9 cores)
+Rscript inst/run_simulations.R --quick  # smoke run (~30 s)
+quarto render inst/simulation_report.qmd
+```
+:::
