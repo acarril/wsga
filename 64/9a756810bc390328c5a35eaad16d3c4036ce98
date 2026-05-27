@@ -1,0 +1,22 @@
+simulation/simulation_report.html
+  s_4b929bccf076dd::t_99a8601186016b 2446-2448,2452,2921
+simulation/simulation_report.qmd
+  s_4b929bccf076dd::t_3316f86d9b5245 78-79,86
+  s_4b929bccf076dd::t_1f90331892e163 87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "649a756810bc390328c5a35eaad16d3c4036ce98",
+  "prompts": {},
+  "sessions": {
+    "s_4b929bccf076dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6947628-cd33-4583-be86-f617be7d520c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
