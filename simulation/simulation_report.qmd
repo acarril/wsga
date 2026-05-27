@@ -75,13 +75,15 @@ y_i = \underbrace{\bigl(2 + \beta_M M_i\bigr) Z_i (1 - G_i)}_{\text{G=0 treatmen
     + 0.3\, x_i (1-G_i) + 0.5\, x_i G_i + \varepsilon_i
 $$
 
-| Symbol | Distribution | Role |
-|--------|-------------|------|
+| Term | Distribution | Role |
+|------|------|------|
 | $x_i$  | $U(-1,1)$   | Running variable |
 | $Z_i = \mathbf{1}[x_i \ge 0]$ | Sharp | Treatment assignment |
 | $G_i$  | $\text{Bern}(0.5)$ | Binary subgroup |
 | $M_i = \delta G_i + \varepsilon_M$ | $\varepsilon_M \sim N(0,1)$ | Moderator (imbalanced by $\delta$) |
 | $\varepsilon_i$ | $N(0, 0.25)$ | Idiosyncratic noise |
+
+: {tbl-colwidths="[38,28,34]"}
 
 **True per-group RD effects**: $b_{G=0} = 2$, $b_{G=1} = 2 + \beta_G$.
 **True differential**: $\Delta = \beta_G = 2$ (held fixed throughout).
