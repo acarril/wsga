@@ -8,11 +8,11 @@
 #   S4  Unobservables   -- residual bias as the untestable IPW assumption fails
 # Plus a bootstrap coverage sub-study nested inside S1.
 #
-# Usage (from rddsga-repo/):
+# Usage (from rddsga-repo/):  Rscript simulation/run_simulations.R [--quick]
 #   Rscript inst/run_simulations.R           # full run (~10 min on 10 cores)
 #   Rscript inst/run_simulations.R --quick   # smoke run (20 reps, small grid)
 #
-# Output: inst/simulation_results/*.csv
+# Output: simulation/simulation_results/*.csv
 # -----------------------------------------------------------------------------
 
 # ---- 0. Setup ----------------------------------------------------------------
@@ -30,7 +30,7 @@ NCORES   <- max(1L, detectCores() - 1L)
 BW       <- 0.5                            # half-bandwidth (fixed throughout)
 TRUE_DIFF <- 2                             # true differential RD effect for S1/S2/S4
 S3_DIFF   <- 0.5                           # smaller effect for S3 power curves
-OUTDIR   <- "inst/simulation_results"
+OUTDIR   <- "simulation/simulation_results"
 
 dir.create(OUTDIR, showWarnings = FALSE)
 RNGkind("L'Ecuyer-CMRG")

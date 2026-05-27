@@ -464,6 +464,6 @@ WSGA at $n = 600$.
 # From the package root:
 Rscript inst/run_simulations.R           # full run (~12 min, 9 cores)
 Rscript inst/run_simulations.R --quick  # smoke run (~30 s)
-quarto render inst/simulation_report.qmd
+quarto render simulation/simulation_report.qmd
 ```
 :::
