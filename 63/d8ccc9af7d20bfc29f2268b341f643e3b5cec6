@@ -1,0 +1,21 @@
+stata/wsga.pkg
+  s_3920bf607702b4::t_8a116ca6e8d76c 28
+stata/rddsga.pkg
+  s_3920bf607702b4::t_cb54e1a276ee0a 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "63d8ccc9af7d20bfc29f2268b341f643e3b5cec6",
+  "prompts": {},
+  "sessions": {
+    "s_3920bf607702b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d84c7d8b-4793-43d3-b9e4-60660b03ba23",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
