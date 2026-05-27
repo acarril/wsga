@@ -1,5 +1,17 @@
 # wsga (R package) NEWS
 
+## wsga 1.3.1 (2026-05-26)
+
+### Internal
+
+- Add Monte Carlo simulation study (`inst/run_simulations.R`) validating
+  four core estimator properties: bias removal (S1), size control under
+  the null (S2), power as a function of K moderators (S3), and sensitivity
+  to unobservable confounding (S4). Full results (1000 reps, 10 cores)
+  saved to `inst/simulation_results/*.csv`. Closes #29.
+
+---
+
 ## wsga 1.3.0 (2026-05-26)
 
 ### New features
