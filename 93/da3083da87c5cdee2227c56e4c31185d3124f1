@@ -1,0 +1,40 @@
+stata/rddsga.pkg
+  s_4b929bccf076dd::t_6f5509f504b2b9 1,21
+stata/stata.toc
+  s_4b929bccf076dd::t_6f5509f504b2b9 1
+stata/wsga.pkg
+  s_4b929bccf076dd::t_6f5509f504b2b9 1,26
+stata/wsga_did.sthlp
+  s_4b929bccf076dd::t_6f5509f504b2b9 2
+NEWS.md
+  s_4b929bccf076dd::t_45116f8e8b62d5 20-26
+  s_4b929bccf076dd::t_ab0e5d42ccc7ba 3-15
+stata/wsga.sthlp
+  s_4b929bccf076dd::t_6f5509f504b2b9 2
+DESCRIPTION
+  s_4b929bccf076dd::t_0c28785db68acb 3
+stata/rddsga.ado
+  s_4b929bccf076dd::t_6f5509f504b2b9 1
+stata/wsga.ado
+  s_4b929bccf076dd::t_6f5509f504b2b9 1
+stata/rddsga.sthlp
+  s_4b929bccf076dd::t_6f5509f504b2b9 2
+stata/wsga_rdd.sthlp
+  s_4b929bccf076dd::t_6f5509f504b2b9 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "93da3083da87c5cdee2227c56e4c31185d3124f1",
+  "prompts": {},
+  "sessions": {
+    "s_4b929bccf076dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6947628-cd33-4583-be86-f617be7d520c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
