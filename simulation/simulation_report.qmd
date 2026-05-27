@@ -62,7 +62,7 @@ This document reports four Monte Carlo scenarios that validate the core
 statistical properties of `wsga` for **sharp regression discontinuity (RD)**
 designs.  All scenarios use the same underlying data-generating process (DGP)
 and are run with $R = 1{,}000$ replications per cell.  The script that
-produced these results lives at `inst/run_simulations.R`.
+produced these results lives at `simulation/run_simulations.R`.
 
 ## Data-generating process {#sec-dgp}
 
@@ -464,8 +464,8 @@ WSGA at $n = 600$.
 
 ```r
 # From the package root:
-Rscript inst/run_simulations.R           # full run (~12 min, 9 cores)
-Rscript inst/run_simulations.R --quick  # smoke run (~30 s)
+Rscript simulation/run_simulations.R           # full run (~12 min, 9 cores)
+Rscript simulation/run_simulations.R --quick  # smoke run (~30 s)
 quarto render simulation/simulation_report.qmd
 ```
 :::
