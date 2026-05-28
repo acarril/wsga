@@ -803,6 +803,23 @@ program define _wsga_rdd_myboo, eclass
   // Store results: functions
   tempvar esample
   gen `esample' = e(sample)
+  // Fail-fast: each subgroup must have observations on BOTH sides of the cutoff
+  // within the estimation sample, otherwise its RD jump is not identified. Abort
+  // now with a clear message rather than crashing mid-bootstrap (#43). The check
+  // is on cutoff side (_cutoff), which is the RD identification precondition for
+  // both sharp and fuzzy designs (cvar is the take-up var in the fuzzy path).
+  forvalues g = 0/1 {
+    qui count if `esample' & `svar' == `g' & _cutoff == 0
+    local _n_below = r(N)
+    qui count if `esample' & `svar' == `g' & _cutoff == 1
+    local _n_above = r(N)
+    if `_n_below' == 0 | `_n_above' == 0 {
+      di as error "wsga rdd: subgroup `svar'==`g' has no observations on one side of the"
+      di as error "cutoff within the estimation sample (below=`_n_below', above=`_n_above')."
+      di as error "Its RD effect is not identified. Check the bandwidth and subgroup variable."
+      exit 111
+    }
+  }
   // Extract b submatrix with subgroup coefficients
   matrix b = e(b)
   matrix b = b[1, "0.`svar'#1.`cvar'".."1.`svar'#1.`cvar'"]
@@ -876,8 +893,10 @@ program define _wsga_rdd_myboo, eclass
   _dots 0, title(`_boot_title') reps(`B')
   cap mat drop cumulative
   if "`seed'" != "" set seed `seed'
+  local B_ok = 0
   tempvar COMSUP_b
   forvalues i=1/`B' {
+    local _rep_ok = 1
     preserve
     if "`wildcluster'" != "" | "`wcbrestricted'" != "" {
       // Draw one Rademacher sign per cluster, broadcast to rows.
@@ -888,20 +907,25 @@ program define _wsga_rdd_myboo, eclass
 
       // Unrestricted y_star -> CI / SE draw (same for WCB-U and WCB-R)
       qui gen double `_wsga_ystar' = `_wsga_xb' + `_wsga_sign' * `_wsga_resid' if `esample'
-      qui `_wsga_cmd_name' `_wsga_ystar' `_wsga_cmd_rhs'
+      capture qui `_wsga_cmd_name' `_wsga_ystar' `_wsga_cmd_rhs'
+      if _rc local _rep_ok = 0
       // Coefficient extraction happens below (shared with pairs path)
 
-      if "`wcbrestricted'" != "" {
+      if "`wcbrestricted'" != "" & `_rep_ok' {
         // Three restricted refits on unrestricted model; p-value counters updated.
         // P-value formula: (1 + #{|draw| >= |est|}) / (B+1) -- no recentering,
         // because restricted draws are centred at 0 under H0 by construction
         // (MacKinnon & Webb 2017, eq. 8).
+        // Refit and _b[] access are in one capture block so an omitted coefficient
+        // in either step skips the counter increment gracefully (#43).
         tempvar _wsga_ys_r0 _wsga_ys_r1 _wsga_ys_rdiff
         qui gen double `_wsga_ys_r0' = ///
           `_wsga_xb_r0' + `_wsga_sign' * `_wsga_resid_r0' if `esample'
-        capture qui `_wsga_cmd_name' `_wsga_ys_r0' `_wsga_cmd_rhs'
-        if !_rc {
+        capture {
+          qui `_wsga_cmd_name' `_wsga_ys_r0' `_wsga_cmd_rhs'
           scalar _wcbr_draw_g0 = _b[0.`svar'#1.`cvar']
+        }
+        if !_rc {
           if abs(_wcbr_draw_g0) >= abs(b[1,1]) ///
             scalar _wcbr_count_g0 = _wcbr_count_g0 + 1
           scalar _wcbr_B_g0 = _wcbr_B_g0 + 1
@@ -909,9 +933,11 @@ program define _wsga_rdd_myboo, eclass
 
         qui gen double `_wsga_ys_r1' = ///
           `_wsga_xb_r1' + `_wsga_sign' * `_wsga_resid_r1' if `esample'
-        capture qui `_wsga_cmd_name' `_wsga_ys_r1' `_wsga_cmd_rhs'
-        if !_rc {
+        capture {
+          qui `_wsga_cmd_name' `_wsga_ys_r1' `_wsga_cmd_rhs'
           scalar _wcbr_draw_g1 = _b[1.`svar'#1.`cvar']
+        }
+        if !_rc {
           if abs(_wcbr_draw_g1) >= abs(b[1,2]) ///
             scalar _wcbr_count_g1 = _wcbr_count_g1 + 1
           scalar _wcbr_B_g1 = _wcbr_B_g1 + 1
@@ -919,9 +945,11 @@ program define _wsga_rdd_myboo, eclass
 
         qui gen double `_wsga_ys_rdiff' = ///
           `_wsga_xb_rdiff' + `_wsga_sign' * `_wsga_resid_rdiff' if `esample'
-        capture qui `_wsga_cmd_name' `_wsga_ys_rdiff' `_wsga_cmd_rhs'
-        if !_rc {
+        capture {
+          qui `_wsga_cmd_name' `_wsga_ys_rdiff' `_wsga_cmd_rhs'
           scalar _wcbr_draw_diff = _b[1.`svar'#1.`cvar'] - _b[0.`svar'#1.`cvar']
+        }
+        if !_rc {
           scalar _orig_diff = b[1,2] - b[1,1]
           if abs(_wcbr_draw_diff) >= abs(_orig_diff) ///
             scalar _wcbr_count_diff = _wcbr_count_diff + 1
@@ -996,32 +1024,77 @@ program define _wsga_rdd_myboo, eclass
       qui replace `kernelipsw' = `ipsweight' * `kwt'
     }
 
-      // Refit the SAVED outcome command, not e(cmdline): the propensity-score
-      // logit above clobbers e(cmdline), so `e(cmdline)' would re-run the logit
-      // (which has no treatment coefficient) and _b[] would fail with r(111) on
-      // every IPW replicate (#43).
-      qui `_saved_cmdline'
+      // Refit the SAVED outcome command, not e(cmdline): the PS logit above
+      // clobbers e(cmdline), so `e(cmdline)' would re-run the logit and the
+      // treatment coefficient would be absent (#43).
+      capture qui `_saved_cmdline'
+      if _rc local _rep_ok = 0
+      // Drop the replicate if resampling emptied a subgroup x cutoff cell: the
+      // treatment coef is then omitted and would silently enter as 0 (#43).
+      if `_rep_ok' {
+        forvalues g = 0/1 {
+          qui count if e(sample) & `svar' == `g' & _cutoff == 0
+          local _n_below = r(N)
+          qui count if e(sample) & `svar' == `g' & _cutoff == 1
+          local _n_above = r(N)
+          if `_n_below' == 0 | `_n_above' == 0 local _rep_ok = 0
+        }
+      }
     }
-    tempname this_run
-    // Non-IV or bootstrap-both-stages
-    if IndIV[1,1]==0 | fixed[1,1]==0 {
-      local b_g0_i = _b[0.`svar'#1.`cvar']
-      local b_g1_i = _b[1.`svar'#1.`cvar']
-      mat `this_run' = (`b_g0_i', `b_g1_i', `b_g1_i' - `b_g0_i')
+    // Coefficient extraction: guarded so an omitted coef in this replicate
+    // drops the rep rather than aborting the whole run (#43).
+    if `_rep_ok' {
+      tempname this_run
+      if IndIV[1,1]==0 | fixed[1,1]==0 {
+        capture {
+          local b_g0_i = _b[0.`svar'#1.`cvar']
+          local b_g1_i = _b[1.`svar'#1.`cvar']
+          mat `this_run' = (`b_g0_i', `b_g1_i', `b_g1_i' - `b_g0_i')
+        }
+        if _rc local _rep_ok = 0
+      }
+      if `_rep_ok' & (IndIV[1,1]==1 & fixed[1,1]==1) {
+        capture {
+          local CoeffIVg0_`i' = _b[0.`svar'#1._cutoff]/FS[1,1]
+          local CoeffIVg1_`i' = _b[1.`svar'#1._cutoff]/FS[1,2]
+          mat `this_run' = (`CoeffIVg0_`i'', `CoeffIVg1_`i'', ///
+            `CoeffIVg1_`i'' - `CoeffIVg0_`i'')
+        }
+        if _rc local _rep_ok = 0
+      }
     }
-    // IV with fixed first stage: bootstrap reduced form, divide by saved FS coefs
-    if IndIV[1,1]==1 & fixed[1,1]==1 {
-      local CoeffIVg0_`i' = _b[0.`svar'#1._cutoff]/FS[1,1]
-      local CoeffIVg1_`i' = _b[1.`svar'#1._cutoff]/FS[1,2]
-      mat `this_run' = (`CoeffIVg0_`i'', `CoeffIVg1_`i'', ///
-        `CoeffIVg1_`i'' - `CoeffIVg0_`i'')
+    if `_rep_ok' {
+      mat cumulative = nullmat(cumulative) \ `this_run'
+      local ++B_ok
     }
-    mat cumulative = nullmat(cumulative) \ `this_run'
     restore
-    _dots `i' 0
+    if `_rep_ok' _dots `i' 0
+    else         _dots `i' 1
   }
 
   di _newline
+  // Abort if every replicate failed
+  if `B_ok' == 0 {
+    di as error "wsga rdd: all `B' bootstrap replicates failed; no inference is possible."
+    di as error "The estimation sample is likely too sparse for bootstrap inference."
+    di as error "Consider widening the bandwidth, dropping block(), or using noipsw."
+    exit 1
+  }
+  // Warn when the drop rate is non-trivial
+  if `B_ok' < `B' {
+    local _n_dropped = `B' - `B_ok'
+    local _pct_dropped = round(100 * `_n_dropped' / `B')
+    if `_pct_dropped' >= 10 {
+      di as error "Warning: `_n_dropped' of `B' bootstrap replicates were dropped (`_pct_dropped'% failure rate)."
+      di as error "Bootstrap SEs and CIs may be unreliable. Consider:"
+      di as error "  - dropping or coarsening the block() stratification variable"
+      di as error "  - widening the bandwidth"
+      di as error "  - using noipsw to disable propensity score weighting"
+    }
+    else {
+      di as text "Note: `_n_dropped' of `B' bootstrap replicates were dropped; B_ok = `B_ok'."
+    }
+  }
   // Compute 2x2 VCV from first two columns (g0, g1)
   cap mat drop V
   mata: cumulative = st_matrix("cumulative")
@@ -1042,7 +1115,7 @@ program define _wsga_rdd_myboo, eclass
     ereturn scalar `scalar' = ``scalar''
   }
   ereturn scalar N_reps = `B'
-  ereturn scalar B_ok   = `B'
+  ereturn scalar B_ok   = `B_ok'
   ereturn scalar level = 95
   if "`cluster'" != "" {
     ereturn scalar N_clust = `_N_clust'
@@ -1059,23 +1132,24 @@ program define _wsga_rdd_myboo, eclass
   }
   else {
     // WCB-U and pairs: recentered formula on unrestricted draws
+    // Use B_ok (surviving reps) for iteration and denominator (#43).
     cap scalar drop bscoef
     forvalues g = 0/1 {
       local count = 0
-      forvalues i = 1/`B' {
+      forvalues i = 1/`B_ok' {
         scalar bscoef = cumulative[`i',`=`g'+1']
         if abs(bscoef - b[1,`=`g'+1']) >= abs(b[1,`=`g'+1']) local count = `count'+1
       }
-      scalar pval`g' = (1+`count') / (`B' + 1)
+      scalar pval`g' = (1+`count') / (`B_ok' + 1)
       ereturn scalar p_g`g' = pval`g'
     }
     scalar orig_diff = b[1,2] - b[1,1]
     local count_diff = 0
-    forvalues i = 1/`B' {
+    forvalues i = 1/`B_ok' {
       scalar bscoef = cumulative[`i',3]
       if abs(bscoef - orig_diff) >= abs(orig_diff) local count_diff = `count_diff' + 1
     }
-    scalar pval_diff = (1 + `count_diff') / (`B' + 1)
+    scalar pval_diff = (1 + `count_diff') / (`B_ok' + 1)
     ereturn scalar p_diff = pval_diff
   }
   // Empirical confidence intervals
