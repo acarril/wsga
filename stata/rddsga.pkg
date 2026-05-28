@@ -1,4 +1,4 @@
-v 1.3.2
+v 1.3.3
 d 'RDDSGA': Deprecated alias for the wsga package
 d
 d  rddsga is the previous name of the wsga (Weighted Subgroup Analysis)
@@ -18,7 +18,7 @@ d KW: IPW
 d
 d Requires: Stata version 11
 d
-d Distribution-Date: 20260527
+d Distribution-Date: 20260528
 d
 d Authors: Alvaro Carril, Mercado Libre
 d          Andre Cazor, PUC Chile

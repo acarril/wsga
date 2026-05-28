@@ -1,4 +1,4 @@
-*! 1.3.2 Alvaro Carril 2026-05-27
+*! 1.3.3 Alvaro Carril 2026-05-28
 program define rddsga
   version 11.1
   di as error "rddsga is removed. Use {cmd:wsga rdd} instead."

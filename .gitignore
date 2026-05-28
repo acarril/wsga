@@ -2,6 +2,9 @@
 *.gph
 *.log
 
+# Replication microdata (not for public repo)
+data/fujiwara/
+
 # R
 .Rproj.user
 .Rhistory

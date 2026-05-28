@@ -1,5 +1,20 @@
 # wsga (R package) NEWS
 
+## wsga 1.3.3 (2026-05-28)
+
+### Bug fixes
+
+- fix(Stata/rdd): the IPW (`m()`-weighted) RDD bootstrap aborted with
+  `r(111)` on the first replicate. The per-replicate propensity-score
+  `logit` clobbered `e(cmdline)`, so the pairs-bootstrap loop re-ran the
+  logit instead of the outcome regression and the treatment-coefficient
+  lookup failed. The loop now refits the outcome command saved before the
+  loop. Affected all `m()`-weighted RDD bootstraps (reduced form, first
+  stage, and 2SLS); `noipsw` was never affected. Added an IPW-bootstrap
+  smoke test (`stata/tests/smoke_rdd_ipw_boot.do`). (#43)
+
+---
+
 ## wsga 1.3.2 (2026-05-27)
 
 ### Documentation

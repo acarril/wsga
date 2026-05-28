@@ -1,4 +1,4 @@
-*! 1.3.2 Alvaro Carril 2026-05-27
+*! 1.3.3 Alvaro Carril 2026-05-28
 
 // -- Dispatcher ----------------------------------------------------------------
 program define wsga
@@ -996,7 +996,11 @@ program define _wsga_rdd_myboo, eclass
       qui replace `kernelipsw' = `ipsweight' * `kwt'
     }
 
-      qui `e(cmdline)'
+      // Refit the SAVED outcome command, not e(cmdline): the propensity-score
+      // logit above clobbers e(cmdline), so `e(cmdline)' would re-run the logit
+      // (which has no treatment coefficient) and _b[] would fail with r(111) on
+      // every IPW replicate (#43).
+      qui `_saved_cmdline'
     }
     tempname this_run
     // Non-IV or bootstrap-both-stages
