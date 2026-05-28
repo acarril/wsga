@@ -564,6 +564,22 @@ wsga_did <- function(formula,
   # Active observations for estimation (non-zero weight and within bw)
   active <- touse & within_bw & final_wt > 0
 
+  # Fail-fast (RDD): each subgroup needs observations on BOTH sides of the cutoff
+  # within the active sample, otherwise its RD jump is not identified. Stop with a
+  # clear message rather than failing cryptically downstream (#43).
+  if (design == "rdd") {
+    for (g in c(0L, 1L)) {
+      n_below <- sum(active & G == g & Z == 0)
+      n_above <- sum(active & G == g & Z == 1)
+      if (n_below == 0 || n_above == 0)
+        stop(sprintf(
+          paste0("Subgroup %s==%d has no observations on one side of the cutoff ",
+                 "within the active sample (below=%d, above=%d); its RD effect is ",
+                 "not identified. Check the bandwidth and subgroup variable."),
+          sgroup_name, g, n_below, n_above), call. = FALSE)
+    }
+  }
+
   # Unweighted counts (for balance table)
   N_G0_unw <- sum(touse & within_bw & G == 0)
   N_G1_unw <- sum(touse & within_bw & G == 1)

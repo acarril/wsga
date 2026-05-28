@@ -60,6 +60,17 @@ test_that("triangular kernel runs", {
   expect_s3_class(fit, "wsga")
 })
 
+test_that("unidentified subgroup (no support on one side) errors clearly (#43)", {
+  d <- rddsga_synth
+  # Subgroup lives entirely on one side of the cutoff: G==0 only above, G==1 only below.
+  d$sg1 <- as.integer(d$x < 0)
+  expect_error(
+    wsga_rdd(y ~ 1 | sg1, data = d, running = ~ x, bwidth = 0.5,
+             noipsw = TRUE, bootstrap = FALSE),
+    "no observations on one side of the cutoff"
+  )
+})
+
 test_that("fuzzy IV model runs", {
   fit <- wsga_rdd(y ~ 1 | sgroup, data = rddsga_synth,
                   running = ~ x, bwidth = 0.5,
