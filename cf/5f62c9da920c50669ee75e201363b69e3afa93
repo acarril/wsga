@@ -1,0 +1,26 @@
+tests/testthat/test-estimation.R
+  s_fca5506958aa82::t_b366c012ecd3ef 63-73
+R/wsga.R
+  s_fca5506958aa82::t_b366c012ecd3ef 567-582
+stata/tests/smoke_rdd_ipw_boot.do
+  s_fca5506958aa82::t_4b94d15b87abbe 91,96-97,100
+  s_fca5506958aa82::t_b366c012ecd3ef 1,3-8,17,22-26,30,34,41-84,87
+stata/wsga.ado
+  s_fca5506958aa82::t_b366c012ecd3ef 806-822,896,899,910-911,914,919-920,924-925,927-928,936-937,939-940,948-949,951-952,1027-1042,1044-1064,1066-1068,1071-1072,1076-1097,1118,1135,1139,1143,1148,1152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "cf5f62c9da920c50669ee75e201363b69e3afa93",
+  "prompts": {},
+  "sessions": {
+    "s_fca5506958aa82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c69e970d-c636-4e24-93a9-14ba1c22fcdc",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
