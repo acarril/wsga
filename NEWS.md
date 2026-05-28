@@ -1,5 +1,24 @@
 # wsga (R package) NEWS
 
+## wsga 1.3.4 (2026-05-28)
+
+### Bug fixes
+
+- fix(Stata/rdd): harden the RDD bootstrap (follow-up to 1.3.3 / #43).
+  Degenerate replicates are now dropped instead of aborting the run; a
+  cell-count guard drops resamples that empty a subgroup x cutoff cell
+  (which would otherwise enter the bootstrap distribution as a spurious
+  `0`); `e(B_ok)` now reports the true surviving-replicate count and is
+  used in the p-value / percentile-CI denominators; warnings fire on
+  dropped replicates (prominent above a 10% drop rate), with a clean
+  abort if all replicates fail.
+- fix: clear fail-fast error (R and Stata) when a subgroup has no
+  observations on one side of the cutoff within the estimation sample
+  (its RD effect is not identified). Previously crashed cryptically
+  (`subscript out of bounds` in R; mid-bootstrap `r(111)` in Stata). (#45)
+
+---
+
 ## wsga 1.3.3 (2026-05-28)
 
 ### Bug fixes
