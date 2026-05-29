@@ -50,9 +50,14 @@
     .scene{flex-direction:column;align-items:flex-start;gap:6vh;min-height:auto;padding:10vh 7vw;}
     .scene .panel{width:100%;}
   }
+  #hero{position:fixed;inset:0;width:100vw;height:100vh;z-index:-1;display:block;}
+  /* scene panels now host nothing visible; the fixed canvas shows through.
+     Keep .plotframe as a sizing spacer but make it invisible. */
+  .plotframe{border-color:transparent;background:transparent;}
 </style>
 </head>
 <body>
+<canvas id="hero" aria-label="Animation: two subgroup distributions over a moderator M, reweighted until they coincide."></canvas>
 <header class="site">
   <div class="kicker">Weighted Subgroup Analysis</div>
   <h1>Two subgroups,<br>pulled into <em>balance</em>.</h1>
@@ -144,6 +149,61 @@ const WSGA = (function(){
   function wsd(arr,t){let mu=wmean(arr,t),s=0,sw=0;for(const p of arr){let wv=w(p,t);s+=wv*(p.m-mu)**2;sw+=wv;}return Math.sqrt(s/sw);}
   function stdDiff(t){return Math.abs(wmean(G1,t)-wmean(G0,t))/Math.sqrt((wsd(G0,t)**2+wsd(G1,t)**2)/2);}
   return {G0,G1,w,kde,wmean,wsd,stdDiff};
+})();
+</script>
+<script>
+// ---- WSGA hero canvas rendering ----
+(function(){
+  const cv=document.getElementById('hero'), ctx=cv.getContext('2d');
+  const INK='#1d2433', RED='#b03a2e';
+  let W,H,DPR;
+  function resize(){DPR=Math.min(2,devicePixelRatio||1);W=cv.clientWidth;H=cv.clientHeight;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+  addEventListener('resize',()=>{resize();drawHero(window.__t||0);});
+
+  // plot occupies the right ~42% of the viewport, vertically centered band
+  const xs=[];for(let i=0;i<=160;i++)xs.push(i/160);
+  function X(m){const left=0.56*W,right=0.95*W;return left+m*(right-left);}
+  function ease(x){return x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2;}
+
+  window.drawHero=function(raw){
+    const t=ease(Math.max(0,Math.min(1,raw)));
+    ctx.clearRect(0,0,W,H);
+    const baseY=H*0.66, amp=H*0.30;
+    const d0=WSGA.kde(WSGA.G0,t,xs,0.05), d1=WSGA.kde(WSGA.G1,t,xs,0.05);
+    const mx=Math.max(Math.max(...d0),Math.max(...d1))*1.05;
+    function curve(d,color,fill){
+      ctx.beginPath();ctx.moveTo(X(0),baseY);
+      for(let i=0;i<xs.length;i++)ctx.lineTo(X(xs[i]),baseY-(d[i]/mx)*amp);
+      ctx.lineTo(X(1),baseY);ctx.fillStyle=fill;ctx.fill();
+      ctx.beginPath();
+      for(let i=0;i<xs.length;i++){let yy=baseY-(d[i]/mx)*amp;i?ctx.lineTo(X(xs[i]),yy):ctx.moveTo(X(xs[i]),yy);}
+      ctx.strokeStyle=color;ctx.lineWidth=1.2;ctx.stroke();
+    }
+    curve(d0,INK,'rgba(29,36,51,0.07)');
+    curve(d1,RED,'rgba(176,58,46,0.07)');
+    function dots(arr,color,grp){for(const p of arr){let wv=WSGA.w(p,t);let r=1.4+Math.sqrt(Math.max(0.05,wv))*1.7;ctx.globalAlpha=0.5;ctx.beginPath();ctx.arc(X(p.m),baseY+10+(grp?9:0),r,0,7);ctx.fillStyle=color;ctx.fill();ctx.globalAlpha=1;}}
+    dots(WSGA.G0,INK,0);dots(WSGA.G1,RED,1);
+    function tick(arr,color){let mu=WSGA.wmean(arr,t);ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(X(mu),baseY-amp-6);ctx.lineTo(X(mu),baseY+6);ctx.strokeStyle=color;ctx.lineWidth=1;ctx.stroke();ctx.setLineDash([]);}
+    tick(WSGA.G0,INK);tick(WSGA.G1,RED);
+    ctx.beginPath();ctx.moveTo(X(0),baseY);ctx.lineTo(X(1),baseY);ctx.strokeStyle='rgba(29,36,51,0.25)';ctx.lineWidth=1;ctx.stroke();
+    // readout
+    ctx.fillStyle='#9a958a';ctx.font="11px 'IBM Plex Mono',monospace";ctx.textAlign='left';
+    ctx.fillText('STD. DIFF IN M',X(0),baseY-amp-26);
+    ctx.fillStyle=INK;ctx.font="26px 'IBM Plex Mono',monospace";
+    ctx.fillText(WSGA.stdDiff(t).toFixed(2),X(0),baseY-amp-2);
+    ctx.fillStyle='#9a958a';ctx.font="11px 'IBM Plex Mono',monospace";ctx.textAlign='right';
+    ctx.fillText('M →',X(1),baseY+22);ctx.textAlign='left';
+  };
+
+  // TEMPORARY: slider to scrub t (removed in Task 5)
+  const sl=document.createElement('input');
+  sl.type='range';sl.min=0;sl.max=1;sl.step=0.01;sl.value=0;
+  sl.style.cssText='position:fixed;left:20px;bottom:20px;z-index:10;width:260px;';
+  sl.id='__tmpslider';
+  sl.addEventListener('input',()=>{window.__t=+sl.value;drawHero(+sl.value);});
+  document.body.appendChild(sl);
+
+  resize();window.__t=0;drawHero(0);
 })();
 </script>
 <script>
