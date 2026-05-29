@@ -1,0 +1,19 @@
+specs/2026-05-29-wsga-landing-v2-visual-narrative-design.md
+  s_c16d216d792e7b::t_6e95b26cd8c5fd 1-100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a8ca7d5cf5a410c29f0e76c3706f11e3964ca71b",
+  "prompts": {},
+  "sessions": {
+    "s_c16d216d792e7b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "28a8e11f-6591-4e8a-ab2e-49a58cd66f83",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
