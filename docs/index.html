@@ -31,7 +31,7 @@
   .scene .text{flex:1.15;}
   .scene .panel{flex:1;}
   .scene .mk{font-size:13px;letter-spacing:.3em;text-transform:uppercase;color:var(--red);}
-  .scene .eq{margin:18px 0 22px;border-left:2px solid var(--red);padding:5px 0 5px 15px;color:var(--ink);font-size:19px;-webkit-font-smoothing:auto;}
+  .scene .eq{margin:18px 0 22px;border-left:2px solid var(--red);padding:5px 0 5px 15px;color:var(--ink);font-size:19px;}
   .scene h2{font-family:var(--serif);font-weight:400;font-size:clamp(26px,3.6vw,40px);line-height:1.08;letter-spacing:-.015em;margin:0;}
   .scene h2 .ll{color:var(--red);font-style:italic;}
   .scene .supp{color:var(--muted);font-size:14px;line-height:1.6;margin-top:20px;max-width:46ch;}
@@ -247,9 +247,6 @@ const WSGA = (function(){
       const yOf=(tau)=>eBot-(Math.max(0,Math.min(0.14,tau))/0.14)*(eBot-eTop);
       // scene-1 anchor: bracket spans the two dot-band centers; scene-2 anchor: panel markers
       const xB=lerp(W*0.585,eMark,align), yTop=lerp(H*0.42,yOf(tau1),align), yBot=lerp(H*0.60,yOf(tau0),align);
-
-      // panel vertical axis (fades in)
-      if(align>0.01){ctx.globalAlpha=align;ctx.strokeStyle='rgba(29,36,51,0.3)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(eX,eTop);ctx.lineTo(eX,eBot);ctx.stroke();ctx.globalAlpha=1;}
 
       // the morphing bracket + Delta label (always present)
       ctx.strokeStyle='rgba(29,36,51,0.45)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(xB+10,yTop);ctx.lineTo(xB,yTop);ctx.lineTo(xB,yBot);ctx.lineTo(xB+10,yBot);ctx.stroke();
