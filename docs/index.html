@@ -125,8 +125,10 @@ Stata: net install wsga, from("https://raw.githubusercontent.com/acarril/wsga/ma
 <script>
 // ---- WSGA hero math (pure; no DOM) ----
 const WSGA = (function(){
-  const MU0=0.42, MU1=0.58, SD=0.17, N=160;
-  function rnorm(m,s){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return m+s*Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+  const MU0=0.42, MU1=0.58, SD=0.17, N=160, SEED=42;
+  function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+  const rng=mulberry32(SEED);
+  function rnorm(m,s){let u=0,v=0;while(!u)u=rng();while(!v)v=rng();return m+s*Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
   function dnorm(x,m,s){return Math.exp(-0.5*((x-m)/s)**2)/(s*Math.sqrt(2*Math.PI));}
   const G0=[],G1=[];
   for(let i=0;i<N;i++)G0.push({m:rnorm(MU0,SD)});
