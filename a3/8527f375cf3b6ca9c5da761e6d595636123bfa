@@ -1,0 +1,21 @@
+specs/verify_hero_math.mjs
+  s_c16d216d792e7b::t_b5047e63f764dc 2-4,6-8,21-23
+docs/index.html
+  s_c16d216d792e7b::t_cc2c4d4d1f717a 128-131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a38527f375cf3b6ca9c5da761e6d595636123bfa",
+  "prompts": {},
+  "sessions": {
+    "s_c16d216d792e7b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "28a8e11f-6591-4e8a-ab2e-49a58cd66f83",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
