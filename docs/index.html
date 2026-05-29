@@ -60,7 +60,7 @@
 </style>
 </head>
 <body>
-<canvas id="hero" aria-label="Animation: two subgroup distributions over a moderator M, reweighted until they coincide."></canvas>
+<canvas id="hero" aria-label="Animation: two subgroups' moderator M is reweighted until balanced; the subgroup effect gap grows from 4 to 9 percentage points once M is held constant."></canvas>
 <header class="site">
   <div class="kicker">Weighted Subgroup Analysis</div>
   <h1>Two subgroups,<br>pulled into <em>balance</em>.</h1>
@@ -69,16 +69,16 @@
 
 <main id="track">
 
-  <section class="scene" data-scene="1" data-t="0">
+  <section class="scene" data-scene="1">
     <div class="text">
       <div class="mk">01 · the setup</div>
-      <h2>Many studies ask how an effect differs <span class="ll">by subgroup</span>.</h2>
-      <div class="supp">Split the sample into G = 0 and G = 1, estimate the treatment effect in each, and compare.</div>
+      <h2>An effect that differs <span class="ll">by subgroup</span>.</h2>
+      <div class="supp">Estimate the treatment effect in G = 0 and G = 1 and compare: a gap of Δ = 4 pp. Is that gap real?</div>
     </div>
     <div class="panel"><div class="plotframe"></div></div>
   </section>
 
-  <section class="scene" data-scene="2" data-t="0">
+  <section class="scene" data-scene="2">
     <div class="text">
       <div class="mk">02 · the problem</div>
       <div class="eq" data-tex="\Delta \;=\; \tau(G{=}1) \;-\; \tau(G{=}0)"></div>
@@ -88,7 +88,7 @@
     <div class="panel"><div class="plotframe"></div></div>
   </section>
 
-  <section class="scene" data-scene="3" data-t="0.6">
+  <section class="scene" data-scene="3">
     <div class="text">
       <div class="mk">03 · the idea</div>
       <div class="eq" data-tex="w_i \;=\; \hat f_{\text{pool}}(M_i) \,/\, \hat f_{G(i)}(M_i)"></div>
@@ -98,17 +98,17 @@
     <div class="panel"><div class="plotframe"></div></div>
   </section>
 
-  <section class="scene" data-scene="4" data-t="1">
+  <section class="scene" data-scene="4">
     <div class="text">
       <div class="mk">04 · balance</div>
       <div class="eq" data-tex="\text{std.\,diff}(M) \;\longrightarrow\; 0"></div>
-      <h2>Now M is distributed <span class="ll">identically</span> across subgroups.</h2>
-      <div class="supp">The remaining difference in effects is attributable to G, holding M constant.</div>
+      <h2>Hold M constant, and the true gap <span class="ll">emerges</span>.</h2>
+      <div class="supp">With M balanced across subgroups, the effect gap is no longer masked: Δ&prime; = 9 pp, attributable to G.</div>
     </div>
     <div class="panel"><div class="plotframe"></div></div>
   </section>
 
-  <section class="scene" data-scene="5" data-t="1">
+  <section class="scene" data-scene="5">
     <div class="text">
       <div class="mk">05 · the honest caveat</div>
       <h2>Observable balance is necessary, not <span class="ll">sufficient</span>.</h2>
