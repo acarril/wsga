@@ -166,13 +166,16 @@ const WSGA = (function(){
 
   // plot occupies the right ~42% of the viewport, vertically centered band
   const xs=[];for(let i=0;i<=160;i++)xs.push(i/160);
-  function X(m){const left=0.56*W,right=0.95*W;return left+m*(right-left);}
+  function X(m){
+    if(W<=760){const left=0.10*W,right=0.90*W;return left+m*(right-left);}
+    const left=0.56*W,right=0.95*W;return left+m*(right-left);
+  }
   function ease(x){return x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2;}
 
   window.drawHero=function(raw){
     const t=ease(Math.max(0,Math.min(1,raw)));
     ctx.clearRect(0,0,W,H);
-    const baseY=H*0.66, amp=H*0.30;
+    const baseY = (W<=760 ? H*0.84 : H*0.66), amp=H*0.30;
     const d0=WSGA.kde(WSGA.G0,t,xs,0.05), d1=WSGA.kde(WSGA.G1,t,xs,0.05);
     const mx=Math.max(Math.max(...d0),Math.max(...d1))*1.05;
     function curve(d,color,fill){
