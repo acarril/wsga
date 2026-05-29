@@ -158,6 +158,7 @@ const WSGA = (function(){
 // ---- WSGA hero canvas rendering ----
 (function(){
   const cv=document.getElementById('hero'), ctx=cv.getContext('2d');
+  const REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
   const INK='#1d2433', RED='#b03a2e';
   let W,H,DPR;
   function resize(){DPR=Math.min(2,devicePixelRatio||1);W=cv.clientWidth;H=cv.clientHeight;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
@@ -210,8 +211,8 @@ const WSGA = (function(){
     if(ticking)return;ticking=true;
     requestAnimationFrame(()=>{window.__t=progress();drawHero(window.__t);ticking=false;});
   }
-  addEventListener('scroll',onScroll,{passive:true});
-  resize();window.__t=progress();drawHero(window.__t);
+  if(REDUCE){ resize();window.__t=1;drawHero(1); }
+  else { addEventListener('scroll',onScroll,{passive:true});resize();window.__t=progress();drawHero(window.__t); }
 })();
 </script>
 <script>
