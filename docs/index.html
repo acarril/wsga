@@ -151,7 +151,14 @@ const WSGA = (function(){
   function wmean(arr,t){let s=0,sw=0;for(const p of arr){let wv=w(p,t);s+=wv*p.m;sw+=wv;}return s/sw;}
   function wsd(arr,t){let mu=wmean(arr,t),s=0,sw=0;for(const p of arr){let wv=w(p,t);s+=wv*(p.m-mu)**2;sw+=wv;}return Math.sqrt(s/sw);}
   function stdDiff(t){return Math.abs(wmean(G1,t)-wmean(G0,t))/Math.sqrt((wsd(G0,t)**2+wsd(G1,t)**2)/2);}
-  return {G0,G1,w,kde,wmean,wsd,stdDiff};
+  // synthetic per-unit treatment effects: tau_i = ALPHA + BETA*G_i + GAMMA*M_i.
+  // GAMMA<0 => high-M units have smaller effects, so M-imbalance MASKS the true gap.
+  // Subgroup effects are weighted means over the same IPW weights -> the gap recomputes honestly.
+  const ALPHA=0.1895, BETA=0.0924, GAMMA=-0.3340;
+  function tau(p,g){return ALPHA+BETA*g+GAMMA*p.m;}
+  function tauMean(arr,g,t){let s=0,sw=0;for(const p of arr){let wv=w(p,t);s+=wv*tau(p,g);sw+=wv;}return s/sw;}
+  function effectGap(t){return tauMean(G1,1,t)-tauMean(G0,0,t);}
+  return {G0,G1,w,kde,wmean,wsd,stdDiff,ALPHA,BETA,GAMMA,tau,tauMean,effectGap};
 })();
 </script>
 <script>
