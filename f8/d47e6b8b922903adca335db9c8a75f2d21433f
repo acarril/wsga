@@ -1,0 +1,21 @@
+specs/2026-05-29-wsga-landing-page-plan.md
+  s_c16d216d792e7b::t_5351ab2f2af22b 115
+  s_c16d216d792e7b::t_81b7ffccda82da 1-91,95,97-114,116-631
+  s_c16d216d792e7b::t_291ee9e9f41429 92-94,96
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f8d47e6b8b922903adca335db9c8a75f2d21433f",
+  "prompts": {},
+  "sessions": {
+    "s_c16d216d792e7b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "28a8e11f-6591-4e8a-ab2e-49a58cd66f83",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
