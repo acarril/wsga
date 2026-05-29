@@ -54,6 +54,9 @@
   /* scene panels now host nothing visible; the fixed canvas shows through.
      Keep .plotframe as a sizing spacer but make it invisible. */
   .plotframe{border-color:transparent;background:transparent;}
+  .scene .text{transition:opacity .5s ease, transform .5s ease;opacity:.12;transform:translateY(12px);}
+  .scene .text.active{opacity:1;transform:none;}
+  @media(prefers-reduced-motion:reduce){.scene .text{opacity:1;transform:none;transition:none;}}
 </style>
 </head>
 <body>
@@ -209,6 +212,15 @@ const WSGA = (function(){
   }
   addEventListener('scroll',onScroll,{passive:true});
   resize();window.__t=progress();drawHero(window.__t);
+})();
+</script>
+<script>
+(function(){
+  const texts=document.querySelectorAll('.scene .text');
+  const io=new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('active'); });
+  },{rootMargin:'-35% 0px -35% 0px',threshold:0});
+  texts.forEach(t=>io.observe(t));
 })();
 </script>
 <script>
