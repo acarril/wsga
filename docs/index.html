@@ -31,7 +31,7 @@
   .scene .text{flex:1.15;}
   .scene .panel{flex:1;}
   .scene .mk{font-size:13px;letter-spacing:.3em;text-transform:uppercase;color:var(--red);}
-  .scene .eq{margin:18px 0 22px;border-left:2px solid var(--red);padding:5px 0 5px 15px;color:var(--ink);font-size:19px;}
+  .scene .eq{margin:18px 0 22px;border-left:2px solid var(--red);padding:5px 0 5px 15px;color:var(--ink);font-size:19px;-webkit-font-smoothing:auto;}
   .scene h2{font-family:var(--serif);font-weight:400;font-size:clamp(26px,3.6vw,40px);line-height:1.08;letter-spacing:-.015em;margin:0;}
   .scene h2 .ll{color:var(--red);font-style:italic;}
   .scene .supp{color:var(--muted);font-size:14px;line-height:1.6;margin-top:20px;max-width:46ch;}
@@ -92,7 +92,7 @@
   <section class="scene" data-scene="3">
     <div class="text">
       <div class="mk">03 · the idea</div>
-      <div class="eq" data-tex="w_i \;=\; \hat f_{\textbf{pool}}(M_i) \,/\, \hat f_{G(i)}(M_i)"></div>
+      <div class="eq" data-tex="w_i \;=\; \hat f_{\text{pool}}(M_i) \,/\, \hat f_{G(i)}(M_i)"></div>
       <h2>Up-weight the units that <span class="ll">look like</span> the other group.</h2>
       <div class="supp">Conversely, down-weight the ones that look like their own. Estimate it from the propensity to belong to G = 1.</div>
     </div>
@@ -102,7 +102,7 @@
   <section class="scene" data-scene="4">
     <div class="text">
       <div class="mk">04 · balance</div>
-      <div class="eq" data-tex="\textbf{std.\,diff}(M) \;\longrightarrow\; 0"></div>
+      <div class="eq" data-tex="\text{std.\,diff}(M) \;\longrightarrow\; 0"></div>
       <h2>Hold <span data-tex="M"></span> constant, and the <span class="ll">true gap</span> emerges.</h2>
       <div class="supp">With M balanced across subgroups, the effect gap is no longer masked: Δ&prime; = 9 pp, attributable to G.</div>
     </div>
