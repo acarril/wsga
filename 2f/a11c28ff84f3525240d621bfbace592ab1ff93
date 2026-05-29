@@ -1,0 +1,26 @@
+docs/index.html
+  s_c16d216d792e7b::t_28babf5783afa4 219
+  s_c16d216d792e7b::t_2d272fdf25746c 87
+  s_c16d216d792e7b::t_810a75191f3255 124
+  s_c16d216d792e7b::t_99467633ab5f21 287-288,290
+  s_c16d216d792e7b::t_e3a3a0f99387c2 233,235
+  s_c16d216d792e7b::t_3b0284d37fcde2 106
+  s_c16d216d792e7b::t_1dcadba84afa11 34
+  s_c16d216d792e7b::t_9597c2926ed4a2 97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "2fa11c28ff84f3525240d621bfbace592ab1ff93",
+  "prompts": {},
+  "sessions": {
+    "s_c16d216d792e7b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "28a8e11f-6591-4e8a-ab2e-49a58cd66f83",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
