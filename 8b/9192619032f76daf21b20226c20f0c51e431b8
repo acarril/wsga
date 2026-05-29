@@ -1,0 +1,21 @@
+.Rbuildignore
+  s_c16d216d792e7b::t_1c86482b2ab58f 8
+specs/2026-05-29-wsga-landing-page-design.md
+  s_c16d216d792e7b::t_5446bc1c68285c 1-107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "8b9192619032f76daf21b20226c20f0c51e431b8",
+  "prompts": {},
+  "sessions": {
+    "s_c16d216d792e7b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "28a8e11f-6591-4e8a-ab2e-49a58cd66f83",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
