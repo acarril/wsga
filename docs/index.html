@@ -238,44 +238,46 @@ const WSGA = (function(){
       ctx.globalAlpha=1;
     }
 
-    // effect panel (fades in with align; carries tau + Delta from scene 2 on)
-    if(align>0.01){
-    ctx.globalAlpha=align;
-    const eTop=H*0.36, eBot=H*0.50, eX=X(0), eMark=X(0)+16;
-    const yOf=(tau)=>eBot-(Math.max(0,Math.min(0.14,tau))/0.14)*(eBot-eTop);
-    const tau0=WSGA.tauMean(WSGA.G0,0,te), tau1=WSGA.tauMean(WSGA.G1,1,te), gap=WSGA.effectGap(te);
-    ctx.fillStyle=MUTED;ctx.font="11px 'IBM Plex Mono',monospace";ctx.textAlign='left';
-    ctx.fillText('EFFECT GAP Δ',eX,eTop-12);
-    ctx.strokeStyle='rgba(29,36,51,0.3)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(eX,eTop);ctx.lineTo(eX,eBot);ctx.stroke();
-    const marker=(tau,color,lab)=>{const y=yOf(tau);ctx.fillStyle=color;ctx.beginPath();ctx.arc(eMark,y,5,0,7);ctx.fill();
-      ctx.font="10px 'IBM Plex Mono',monospace";ctx.textAlign='left';ctx.fillStyle=color;ctx.fillText(lab+' '+(tau*100).toFixed(1)+'pp',eMark+12,y+3);};
-    const y0=yOf(tau0), y1=yOf(tau1), bx=eMark-12;
-    ctx.strokeStyle='rgba(29,36,51,0.4)';ctx.beginPath();ctx.moveTo(eMark,y0);ctx.lineTo(bx,y0);ctx.lineTo(bx,y1);ctx.lineTo(eMark,y1);ctx.stroke();
-    marker(tau0,INK,'τ(G0)');marker(tau1,RED,'τ(G1)');
-    ctx.fillStyle=INK;ctx.font="15px 'IBM Plex Mono',monospace";ctx.textAlign='right';
-    ctx.fillText('Δ '+(gap*100).toFixed(0)+'pp',bx-6,(y0+y1)/2+5);ctx.textAlign='left';
-    ctx.fillStyle=MUTED;ctx.font="10px 'IBM Plex Mono',monospace";
-    const subl = align<0.99 ? 'comparing subgroup effects'
-               : te<0.05 ? 'but is the gap G, or M?'
-               : te<0.95 ? 'holding M constant…'
-               : 'holding M constant';
-    ctx.fillText(subl,eX,eBot+18);
-    ctx.globalAlpha=1;
-    }
+    // effect-gap display: ONE bracket that MORPHS from the scene-1 band gap into the
+    // compact panel (endpoints interpolate by align); panel chrome (axis, tau markers,
+    // value labels, sub-label) fades in; the scene-1 G-band labels fade out.
+    {
+      const tau0=WSGA.tauMean(WSGA.G0,0,te), tau1=WSGA.tauMean(WSGA.G1,1,te), gap=WSGA.effectGap(te);
+      const eTop=H*0.36, eBot=H*0.50, eX=X(0), eMark=X(0)+16;
+      const yOf=(tau)=>eBot-(Math.max(0,Math.min(0.14,tau))/0.14)*(eBot-eTop);
+      // scene-1 anchor: bracket spans the two dot-band centers; scene-2 anchor: panel markers
+      const xB=lerp(W*0.585,eMark,align), yTop=lerp(H*0.42,yOf(tau1),align), yBot=lerp(H*0.60,yOf(tau0),align);
 
-    // scene-1 explicit effect-gap bracket between the two dot bands (fades out as dots align)
-    if(align<0.99){
-      ctx.globalAlpha=1-align;
-      const yG1=H*0.42, yG0=H*0.60, xBr=W*0.585;
+      // panel vertical axis (fades in)
+      if(align>0.01){ctx.globalAlpha=align;ctx.strokeStyle='rgba(29,36,51,0.3)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(eX,eTop);ctx.lineTo(eX,eBot);ctx.stroke();ctx.globalAlpha=1;}
+
+      // the morphing bracket + Delta label (always present)
+      ctx.strokeStyle='rgba(29,36,51,0.45)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(xB+10,yTop);ctx.lineTo(xB,yTop);ctx.lineTo(xB,yBot);ctx.lineTo(xB+10,yBot);ctx.stroke();
+      ctx.fillStyle=INK;ctx.font=Math.round(lerp(16,15,align))+"px 'IBM Plex Mono',monospace";ctx.textAlign='right';
+      ctx.fillText('Δ '+(gap*100).toFixed(0)+'pp',xB-8,(yTop+yBot)/2+5);ctx.textAlign='left';
+
+      // EFFECT GAP header (always), just above the bracket top
       ctx.fillStyle=MUTED;ctx.font="10px 'IBM Plex Mono',monospace";ctx.textAlign='left';
-      ctx.fillText('EFFECT GAP',xBr-2,yG1-H*0.10);
-      ctx.font="11px 'IBM Plex Mono',monospace";
-      ctx.fillStyle=RED;ctx.fillText('G = 1',W*0.925,yG1+4);
-      ctx.fillStyle=INK;ctx.fillText('G = 0',W*0.925,yG0+4);
-      ctx.strokeStyle='rgba(29,36,51,0.45)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(xBr+10,yG1);ctx.lineTo(xBr,yG1);ctx.lineTo(xBr,yG0);ctx.lineTo(xBr+10,yG0);ctx.stroke();
-      ctx.fillStyle=INK;ctx.font="16px 'IBM Plex Mono',monospace";ctx.textAlign='right';
-      ctx.fillText('Δ '+(WSGA.effectGap(te)*100).toFixed(0)+'pp',xBr-8,(yG1+yG0)/2+5);
-      ctx.textAlign='left';ctx.globalAlpha=1;
+      ctx.fillText('EFFECT GAP',xB-2,yTop-lerp(H*0.065,16,align));
+
+      // tau markers + value labels + sub-label (panel chrome) fade in
+      if(align>0.01){
+        ctx.globalAlpha=align;
+        const marker=(tau,color,lab)=>{const y=yOf(tau);ctx.fillStyle=color;ctx.beginPath();ctx.arc(eMark,y,5,0,7);ctx.fill();
+          ctx.font="10px 'IBM Plex Mono',monospace";ctx.textAlign='left';ctx.fillStyle=color;ctx.fillText(lab+' '+(tau*100).toFixed(1)+'pp',eMark+12,y+3);};
+        marker(tau0,INK,'τ(G0)');marker(tau1,RED,'τ(G1)');
+        ctx.fillStyle=MUTED;ctx.font="10px 'IBM Plex Mono',monospace";ctx.textAlign='left';
+        ctx.fillText(te<0.05?'but is the gap G, or M?':te<0.95?'holding M constant…':'holding M constant',eX,eBot+18);
+        ctx.globalAlpha=1;
+      }
+
+      // scene-1 G-band labels fade out
+      if(align<0.99){
+        ctx.globalAlpha=1-align;ctx.font="11px 'IBM Plex Mono',monospace";ctx.textAlign='left';
+        ctx.fillStyle=RED;ctx.fillText('G = 1',W*0.925,H*0.42+4);
+        ctx.fillStyle=INK;ctx.fillText('G = 0',W*0.925,H*0.60+4);
+        ctx.globalAlpha=1;
+      }
     }
 
     // scene-05 hidden-dimension cue
