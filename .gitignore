@@ -18,3 +18,4 @@ vignettes/*.html
 vignettes/*.pdf
 doc/
 Meta/
+.superpowers/
