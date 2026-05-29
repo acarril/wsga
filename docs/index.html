@@ -123,6 +123,28 @@ Stata: net install wsga, from("https://raw.githubusercontent.com/acarril/wsga/ma
 </footer>
 
 <script>
+// ---- WSGA hero math (pure; no DOM) ----
+const WSGA = (function(){
+  const MU0=0.42, MU1=0.58, SD=0.17, N=160;
+  function rnorm(m,s){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return m+s*Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+  function dnorm(x,m,s){return Math.exp(-0.5*((x-m)/s)**2)/(s*Math.sqrt(2*Math.PI));}
+  const G0=[],G1=[];
+  for(let i=0;i<N;i++)G0.push({m:rnorm(MU0,SD)});
+  for(let i=0;i<N;i++)G1.push({m:rnorm(MU1,SD)});
+  // true IPW weights toward pooled (mode 2), ANALYTIC densities (NOT KDE)
+  for(const [arr,g] of [[G0,0],[G1,1]]){
+    for(const p of arr){const f0=dnorm(p.m,MU0,SD),f1=dnorm(p.m,MU1,SD),fp=0.5*(f0+f1);p.tw=fp/(g===0?f0:f1);}
+    const mean=arr.reduce((a,p)=>a+p.tw,0)/arr.length; arr.forEach(p=>p.tw/=mean);
+  }
+  function w(p,t){return 1+t*(p.tw-1);}
+  function kde(arr,t,xs,h){return xs.map(x=>{let s=0;for(const p of arr){let wv=w(p,t);let d=(x-p.m)/h;s+=wv*Math.exp(-0.5*d*d);}return s/arr.length;});}
+  function wmean(arr,t){let s=0,sw=0;for(const p of arr){let wv=w(p,t);s+=wv*p.m;sw+=wv;}return s/sw;}
+  function wsd(arr,t){let mu=wmean(arr,t),s=0,sw=0;for(const p of arr){let wv=w(p,t);s+=wv*(p.m-mu)**2;sw+=wv;}return Math.sqrt(s/sw);}
+  function stdDiff(t){return Math.abs(wmean(G1,t)-wmean(G0,t))/Math.sqrt((wsd(G0,t)**2+wsd(G1,t)**2)/2);}
+  return {G0,G1,w,kde,wmean,wsd,stdDiff};
+})();
+</script>
+<script>
   // KaTeX render of inline equations (defer-loaded; run on load)
   window.addEventListener('load',function(){
     if(!window.katex)return;
