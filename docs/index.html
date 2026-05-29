@@ -31,7 +31,7 @@
   .scene .text{flex:1.15;}
   .scene .panel{flex:1;}
   .scene .mk{font-size:13px;letter-spacing:.3em;text-transform:uppercase;color:var(--red);}
-  .scene .eq{margin:18px 0 22px;border-left:2px solid var(--red);padding:5px 0 5px 15px;color:#3a3f4a;font-size:19px;}
+  .scene .eq{margin:18px 0 22px;border-left:2px solid var(--red);padding:5px 0 5px 15px;color:var(--ink);font-size:19px;}
   .scene h2{font-family:var(--serif);font-weight:400;font-size:clamp(26px,3.6vw,40px);line-height:1.08;letter-spacing:-.015em;margin:0;}
   .scene h2 .ll{color:var(--red);font-style:italic;}
   .scene .supp{color:var(--muted);font-size:14px;line-height:1.6;margin-top:20px;max-width:46ch;}
@@ -84,7 +84,7 @@
       <div class="mk">02 · the problem</div>
       <div class="eq" data-tex="\mathbb{E}[M \mid G{=}1] \;\neq\; \mathbb{E}[M \mid G{=}0]"></div>
       <h2><span data-tex="G"></span> is tangled with other moderators <span data-tex="M"></span>.</h2>
-      <div class="supp">Is the effect different by G — or by what G is <em>correlated with</em>? The subgroups don't share the same distribution of M.</div>
+      <div class="supp">Is the effect different by G, or by what G is <em>correlated with</em>? The subgroups don't share the same distribution of M.</div>
     </div>
     <div class="panel"><div class="plotframe"></div></div>
   </section>
@@ -94,7 +94,7 @@
       <div class="mk">03 · the idea</div>
       <div class="eq" data-tex="w_i \;=\; \hat f_{\text{pool}}(M_i) \,/\, \hat f_{G(i)}(M_i)"></div>
       <h2>Up-weight the units that <span class="ll">look like</span> the other group.</h2>
-      <div class="supp">— and down-weight the ones that look like their own. Estimate it from the propensity to belong to G = 1.</div>
+      <div class="supp">Conversely, down-weight the ones that look like their own. Estimate it from the propensity to belong to G = 1.</div>
     </div>
     <div class="panel"><div class="plotframe"></div></div>
   </section>
@@ -103,7 +103,7 @@
     <div class="text">
       <div class="mk">04 · balance</div>
       <div class="eq" data-tex="\text{std.\,diff}(M) \;\longrightarrow\; 0"></div>
-      <h2>Hold <span data-tex="M"></span> constant, and the true gap <span class="ll">emerges</span>.</h2>
+      <h2>Hold <span data-tex="M"></span> constant, and the <span class="ll">true gap</span> emerges.</h2>
       <div class="supp">With M balanced across subgroups, the effect gap is no longer masked: Δ&prime; = 9 pp, attributable to G.</div>
     </div>
     <div class="panel"><div class="plotframe"></div></div>
@@ -121,7 +121,7 @@
 </main>
 
 <footer class="site">
-  <h2>Use it.</h2>
+  <h2>Try it!</h2>
   <div class="links">
     <a href="https://github.com/acarril/wsga">GitHub repository</a>
     <a href="simulation-report.html">Monte Carlo simulation report</a>
@@ -216,7 +216,7 @@ const WSGA = (function(){
     // dots: 2D cloud (align=0) -> M-axis lane (align=1); radius by weight (te), exaggerated
     const dots=(arr,color,grp)=>{
       for(const p2 of arr){
-        const x=lerp(p2.cxn*W,X(p2.m),align), y=lerp(p2.cyn*H,baseY+10+(grp?9:0),align);
+        const x=lerp(p2.cxn*W,X(p2.m),align), y=lerp(p2.cyn*H,baseY+10+(grp?24:0),align);
         const wv=WSGA.w(p2,te); const r=2.2+Math.pow(Math.max(0.05,wv),0.9)*2.7;
         ctx.globalAlpha=0.5;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=color;ctx.fill();ctx.globalAlpha=1;
       }
@@ -230,9 +230,9 @@ const WSGA = (function(){
       tick(WSGA.G0,INK);tick(WSGA.G1,RED);
       ctx.beginPath();ctx.moveTo(X(0),baseY);ctx.lineTo(X(1),baseY);ctx.strokeStyle='rgba(29,36,51,0.25)';ctx.lineWidth=1;ctx.stroke();
       ctx.fillStyle=MUTED;ctx.font="11px 'IBM Plex Mono',monospace";ctx.textAlign='left';
-      ctx.fillText('STD. DIFF IN M',X(0),baseY+42);
+      ctx.fillText('STD. DIFF IN M',X(0),baseY+58);
       ctx.fillStyle=INK;ctx.font="24px 'IBM Plex Mono',monospace";
-      ctx.fillText(WSGA.stdDiff(te).toFixed(2),X(0),baseY+68);
+      ctx.fillText(WSGA.stdDiff(te).toFixed(2),X(0),baseY+84);
       ctx.fillStyle=MUTED;ctx.font="11px 'IBM Plex Mono',monospace";ctx.textAlign='right';
       ctx.fillText('M →',X(1),baseY+22);ctx.textAlign='left';
       ctx.globalAlpha=1;
@@ -284,10 +284,10 @@ const WSGA = (function(){
     if(hidden>0.01){
       ctx.globalAlpha=0.6*hidden;
       ctx.fillStyle=MUTED;ctx.font="11px 'IBM Plex Mono',monospace";ctx.textAlign='left';
-      ctx.fillText('unobserved U — weighting can’t see this',X(0),baseY+94);
-      ctx.strokeStyle='rgba(115,118,126,0.4)';ctx.setLineDash([2,4]);ctx.beginPath();ctx.moveTo(X(0),baseY+110);ctx.lineTo(X(1),baseY+110);ctx.stroke();ctx.setLineDash([]);
+      ctx.fillText('unobserved U — weighting can’t see this',X(0),baseY+114);
+      ctx.strokeStyle='rgba(115,118,126,0.4)';ctx.setLineDash([2,4]);ctx.beginPath();ctx.moveTo(X(0),baseY+130);ctx.lineTo(X(1),baseY+130);ctx.stroke();ctx.setLineDash([]);
       ctx.fillStyle='rgba(115,118,126,0.55)';
-      for(let i=0;i<24;i++){const gx=X(0.05+0.9*((i*0.137)%1));ctx.beginPath();ctx.arc(gx,baseY+110,2.5,0,7);ctx.fill();}
+      for(let i=0;i<24;i++){const gx=X(0.05+0.9*((i*0.137)%1));ctx.beginPath();ctx.arc(gx,baseY+130,2.5,0,7);ctx.fill();}
       ctx.globalAlpha=1;
     }
   };
