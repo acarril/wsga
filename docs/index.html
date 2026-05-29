@@ -167,7 +167,7 @@ const WSGA = (function(){
 (function(){
   const cv=document.getElementById('hero'), ctx=cv.getContext('2d');
   const REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-  const INK='#1d2433', RED='#b03a2e', MUTED='#9a958a';
+  const INK='#1d2433', RED='#b03a2e', MUTED='#696b72';
   let W,H,DPR;
   function resize(){DPR=Math.min(2,devicePixelRatio||1);W=cv.clientWidth;H=cv.clientHeight;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
 
