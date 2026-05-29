@@ -1,0 +1,20 @@
+specs/2026-05-29-wsga-landing-v2-visual-narrative-plan.md
+  s_c16d216d792e7b::t_d0072cde998082 356-425
+  s_c16d216d792e7b::t_95a79216a649d9 1-355
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "bbe838a7d6afdd82a4901e0c51c961f836dff84c",
+  "prompts": {},
+  "sessions": {
+    "s_c16d216d792e7b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "28a8e11f-6591-4e8a-ab2e-49a58cd66f83",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
