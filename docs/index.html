@@ -92,7 +92,7 @@
   <section class="scene" data-scene="3">
     <div class="text">
       <div class="mk">03 · the idea</div>
-      <div class="eq" data-tex="w_i \;=\; \hat f_{\text{pool}}(M_i) \,/\, \hat f_{G(i)}(M_i)"></div>
+      <div class="eq" data-tex="w_i \;=\; \hat f_{\textbf{pool}}(M_i) \,/\, \hat f_{G(i)}(M_i)"></div>
       <h2>Up-weight the units that <span class="ll">look like</span> the other group.</h2>
       <div class="supp">Conversely, down-weight the ones that look like their own. Estimate it from the propensity to belong to G = 1.</div>
     </div>
@@ -102,7 +102,7 @@
   <section class="scene" data-scene="4">
     <div class="text">
       <div class="mk">04 · balance</div>
-      <div class="eq" data-tex="\text{std.\,diff}(M) \;\longrightarrow\; 0"></div>
+      <div class="eq" data-tex="\textbf{std.\,diff}(M) \;\longrightarrow\; 0"></div>
       <h2>Hold <span data-tex="M"></span> constant, and the <span class="ll">true gap</span> emerges.</h2>
       <div class="supp">With M balanced across subgroups, the effect gap is no longer masked: Δ&prime; = 9 pp, attributable to G.</div>
     </div>
@@ -167,7 +167,7 @@ const WSGA = (function(){
 (function(){
   const cv=document.getElementById('hero'), ctx=cv.getContext('2d');
   const REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-  const INK='#1d2433', RED='#b03a2e', MUTED='#696b72';
+  const INK='#1d2433', RED='#b03a2e', MUTED='#9a958a';
   let W,H,DPR;
   function resize(){DPR=Math.min(2,devicePixelRatio||1);W=cv.clientWidth;H=cv.clientHeight;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
 
