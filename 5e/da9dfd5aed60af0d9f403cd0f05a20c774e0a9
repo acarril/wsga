@@ -1,0 +1,21 @@
+.Rbuildignore
+  s_c16d216d792e7b::t_d93def773d6331 7
+docs/index.html
+  s_c16d216d792e7b::t_3c06458b2aee12 1-3336
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "5eda9dfd5aed60af0d9f403cd0f05a20c774e0a9",
+  "prompts": {},
+  "sessions": {
+    "s_c16d216d792e7b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "28a8e11f-6591-4e8a-ab2e-49a58cd66f83",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
