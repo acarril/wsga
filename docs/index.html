@@ -72,8 +72,9 @@
   <section class="scene" data-scene="1">
     <div class="text">
       <div class="mk">01 · the setup</div>
+      <div class="eq" data-tex="\Delta \;=\; \tau(G{=}1) \;-\; \tau(G{=}0)"></div>
       <h2>Comparing an effect <span class="ll">across subgroups</span>.</h2>
-      <div class="supp">Estimate the treatment effect within G = 0 and within G = 1, then compare them — a gap of Δ = 4 pp. Should we trust it?</div>
+      <div class="supp">Estimate the treatment effect within subgroup G = 0 and within subgroup G = 1, then compare them. A gap of Δ = 4 pp. Should we trust it?</div>
     </div>
     <div class="panel"><div class="plotframe"></div></div>
   </section>
@@ -81,8 +82,8 @@
   <section class="scene" data-scene="2">
     <div class="text">
       <div class="mk">02 · the problem</div>
-      <div class="eq" data-tex="\Delta \;=\; \tau(G{=}1) \;-\; \tau(G{=}0)"></div>
-      <h2>But G is tangled with other moderators M.</h2>
+      <div class="eq" data-tex="\mathbb{E}[M \mid G{=}1] \;\neq\; \mathbb{E}[M \mid G{=}0]"></div>
+      <h2><span data-tex="G"></span> is tangled with other moderators <span data-tex="M"></span>.</h2>
       <div class="supp">Is the effect different by G — or by what G is <em>correlated with</em>? The subgroups don't share the same distribution of M.</div>
     </div>
     <div class="panel"><div class="plotframe"></div></div>
@@ -102,7 +103,7 @@
     <div class="text">
       <div class="mk">04 · balance</div>
       <div class="eq" data-tex="\text{std.\,diff}(M) \;\longrightarrow\; 0"></div>
-      <h2>Hold M constant, and the true gap <span class="ll">emerges</span>.</h2>
+      <h2>Hold <span data-tex="M"></span> constant, and the true gap <span class="ll">emerges</span>.</h2>
       <div class="supp">With M balanced across subgroups, the effect gap is no longer masked: Δ&prime; = 9 pp, attributable to G.</div>
     </div>
     <div class="panel"><div class="plotframe"></div></div>
@@ -322,7 +323,7 @@ const WSGA = (function(){
   // KaTeX render of inline equations (defer-loaded; run on load)
   window.addEventListener('load',function(){
     if(!window.katex)return;
-    document.querySelectorAll('.eq[data-tex]').forEach(function(el){
+    document.querySelectorAll('[data-tex]').forEach(function(el){
       try{katex.render(el.getAttribute('data-tex'),el,{throwOnError:false,displayMode:false});}catch(e){el.textContent=el.getAttribute('data-tex');}
     });
   });
