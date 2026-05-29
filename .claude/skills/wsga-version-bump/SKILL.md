@@ -1,15 +1,15 @@
 ---
 name: wsga-version-bump
-description: Bump the wsga package version across all 11 version-bearing files (R `DESCRIPTION`, `NEWS.md`, the four Stata `.sthlp` files, both `.ado` files, both `.pkg` files, and `stata.toc`). Use BEFORE opening any PR against `acarril/wsga`. Trigger on phrases like "bump the version", "prepare a release", "release X.Y.Z", "version bump for wsga", or when a feature/bugfix branch is ready to merge and CLAUDE.md's versioning rule applies. Also use when correcting a prior bump (re-target the new version, run again). Do not skip — the R and Stata components share one unified version and any drift indicates this skill was bypassed.
+description: Bump the wsga package version across all 11 version-bearing files (R `DESCRIPTION`, `NEWS.md`, the four Stata `.sthlp` files, both `.ado` files, both `.pkg` files, and `stata.toc`). Use BEFORE opening a PR that changes the R or Stata package in `acarril/wsga`. Trigger on phrases like "bump the version", "prepare a release", "release X.Y.Z", "version bump for wsga", or when a package-changing feature/bugfix branch is ready to merge and CLAUDE.md's versioning rule applies. Also use when correcting a prior bump (re-target the new version, run again). Do not skip — the R and Stata components share one unified version and any drift indicates this skill was bypassed.
 ---
 
 # wsga Version Bump
 
-The wsga package is dual-language (R + Stata) and ships a unified `MAJOR.MINOR.PATCH` version. Eleven files carry the version string; every PR that touches the repo must bump all of them so nothing drifts. This skill walks through the procedure end-to-end and verifies the result.
+The wsga package is dual-language (R + Stata) and ships a unified `MAJOR.MINOR.PATCH` version. Eleven files carry the version string; any PR that changes the R or Stata package must bump all of them so the two never drift. (PRs touching only non-package files — e.g. `docs/`, `specs/`, CI workflows — do not need a bump.) This skill walks through the procedure end-to-end and verifies the result.
 
 ## When to use
 
-- Before opening any PR against `acarril/wsga` (CLAUDE.md mandates this).
+- Before opening a PR that changes the R or Stata package in `acarril/wsga` (CLAUDE.md mandates this).
 - When the user says "bump the version", "prepare a release", "release 1.x.y".
 - When a prior bump was wrong and needs correcting — re-run with the corrected target version. The procedure is idempotent if every location currently shows the same (wrong) version.
 
