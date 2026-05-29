@@ -1,0 +1,19 @@
+docs/index.html
+  s_c16d216d792e7b::t_57dc40833c8958 170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7045d47c599974845e5e566082d87aee61843ac9",
+  "prompts": {},
+  "sessions": {
+    "s_c16d216d792e7b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "28a8e11f-6591-4e8a-ab2e-49a58cd66f83",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
