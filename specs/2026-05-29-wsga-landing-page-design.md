@@ -51,6 +51,7 @@ The plot is **continuous across all 5 scenes** (single sticky canvas); only `t`,
 Two subgroups' distributions over a moderator `M`, rendered as fine density curves (ink = G=0, red = G=1) with weight-sized dots along a baseline and dashed weighted-mean ticks.
 
 - **Synthetic DGP:** two Gaussians with genuine common support — `μ₀=0.42, μ₁=0.58, σ=0.17`, N=160 per group. (Common support matters: well-separated groups can't be balanced — itself a real WSGA caveat.)
+- **Deterministic:** the PRNG is seeded (mulberry32, **seed 42**) so every visitor sees the same hand-picked instance. At N=160 a fresh random draw is noisy (weighted std-diff can land anywhere in ~0.01–0.45); seeding fixes a good instance (0.941 → 0.041) and makes the Node guard test the exact rendered config.
 - **Weights (true IPW, mode 2 — balance both toward pooled):** `wᵢ = f_pool(Mᵢ) / f_{G(i)}(Mᵢ)`, using the **analytic** Gaussian densities (legitimate since the DGP is known), normalized to mean 1 within each group so effective N is preserved.
 - **Live readout:** standardized difference in `M`, computed from weighted moments. Validated endpoints: **unweighted ≈ 0.97 → IPW-weighted ≈ 0.05** (matches the paper's 0.68→0.08 spirit). Max weight modest (~6–10), no clipping.
 - **Known pitfall (resolved):** KDE-based densities bias the ratio via self-inclusion and floor the weighted std-diff at ~0.25. Must use analytic densities for the weights. Display curves may still use KDE for smoothness; the *weights and readout* must use analytic densities.

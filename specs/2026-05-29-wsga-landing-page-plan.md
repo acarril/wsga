@@ -232,6 +232,8 @@ git commit -m "Add landing page skeleton (no-JS baseline, 5 scenes)"
 
 Add the pure math (synthetic data, analytic IPW weights, weighted moments, standardized difference) as an inline script, and a throwaway Node script that asserts the validated endpoints so the bug-prone weighting can't silently regress.
 
+> **Implementation note (applied):** the PRNG is **seeded with mulberry32, seed 42**, so the page is deterministic (0.941 → 0.041 every load) — at N=160 an unseeded draw is too noisy (weighted std-diff can exceed 0.2). The `rnorm` below draws from `rng()` not `Math.random()`, the constants line includes `SEED=42`, and the guard mirrors the same seed/N. See committed `docs/index.html` and `specs/verify_hero_math.mjs` for the exact seeded form.
+
 **Files:**
 - Modify: `docs/index.html` (add a `<script>` block defining `WSGA` math object — place it immediately before the existing KaTeX render script)
 - Create: `specs/verify_hero_math.mjs`
