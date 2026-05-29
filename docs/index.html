@@ -195,15 +195,20 @@ const WSGA = (function(){
     ctx.fillText('M →',X(1),baseY+22);ctx.textAlign='left';
   };
 
-  // TEMPORARY: slider to scrub t (removed in Task 5)
-  const sl=document.createElement('input');
-  sl.type='range';sl.min=0;sl.max=1;sl.step=0.01;sl.value=0;
-  sl.style.cssText='position:fixed;left:20px;bottom:20px;z-index:10;width:260px;';
-  sl.id='__tmpslider';
-  sl.addEventListener('input',()=>{window.__t=+sl.value;drawHero(+sl.value);});
-  document.body.appendChild(sl);
-
-  resize();window.__t=0;drawHero(0);
+  const track=document.getElementById('track');
+  let ticking=false;
+  function progress(){
+    const r=track.getBoundingClientRect();
+    const total=r.height-window.innerHeight;          // scrollable distance within the track
+    const scrolled=Math.min(Math.max(-r.top,0),total);
+    return total>0 ? scrolled/total : 0;
+  }
+  function onScroll(){
+    if(ticking)return;ticking=true;
+    requestAnimationFrame(()=>{window.__t=progress();drawHero(window.__t);ticking=false;});
+  }
+  addEventListener('scroll',onScroll,{passive:true});
+  resize();window.__t=progress();drawHero(window.__t);
 })();
 </script>
 <script>
