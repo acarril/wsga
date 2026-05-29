@@ -72,8 +72,8 @@
   <section class="scene" data-scene="1">
     <div class="text">
       <div class="mk">01 · the setup</div>
-      <h2>An effect that differs <span class="ll">by subgroup</span>.</h2>
-      <div class="supp">Estimate the treatment effect in G = 0 and G = 1 and compare: a gap of Δ = 4 pp. Is that gap real?</div>
+      <h2>Comparing an effect <span class="ll">across subgroups</span>.</h2>
+      <div class="supp">Estimate the treatment effect within G = 0 and within G = 1, then compare them — a gap of Δ = 4 pp. Should we trust it?</div>
     </div>
     <div class="panel"><div class="plotframe"></div></div>
   </section>
@@ -174,8 +174,9 @@ const WSGA = (function(){
   (function seedClouds(){
     function mb(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
     const r=mb(7);
-    for(const [arr,cx] of [[WSGA.G0,0.66],[WSGA.G1,0.83]]){
-      for(const p of arr){ p.cxn=cx+(r()-0.5)*0.12; p.cyn=0.60+(r()-0.5)*0.16; }
+    // two horizontal bands at effect heights: G1 (bigger effect) upper, G0 lower
+    for(const [arr,cy] of [[WSGA.G0,0.60],[WSGA.G1,0.42]]){
+      for(const p of arr){ p.cxn=0.61+r()*0.30; p.cyn=cy+(r()-0.5)*0.09; }
     }
   })();
 
@@ -236,7 +237,9 @@ const WSGA = (function(){
       ctx.globalAlpha=1;
     }
 
-    // effect panel (always visible) -- vertical tau axis, two markers, Delta bracket
+    // effect panel (fades in with align; carries tau + Delta from scene 2 on)
+    if(align>0.01){
+    ctx.globalAlpha=align;
     const eTop=H*0.36, eBot=H*0.50, eX=X(0), eMark=X(0)+16;
     const yOf=(tau)=>eBot-(Math.max(0,Math.min(0.14,tau))/0.14)*(eBot-eTop);
     const tau0=WSGA.tauMean(WSGA.G0,0,te), tau1=WSGA.tauMean(WSGA.G1,1,te), gap=WSGA.effectGap(te);
@@ -251,11 +254,28 @@ const WSGA = (function(){
     ctx.fillStyle=INK;ctx.font="15px 'IBM Plex Mono',monospace";ctx.textAlign='right';
     ctx.fillText('Δ '+(gap*100).toFixed(0)+'pp',bx-6,(y0+y1)/2+5);ctx.textAlign='left';
     ctx.fillStyle=MUTED;ctx.font="10px 'IBM Plex Mono',monospace";
-    const subl = align<0.99 ? 'effects differ by subgroup'
+    const subl = align<0.99 ? 'comparing subgroup effects'
                : te<0.05 ? 'but is the gap G, or M?'
                : te<0.95 ? 'holding M constant…'
                : 'holding M constant';
     ctx.fillText(subl,eX,eBot+18);
+    ctx.globalAlpha=1;
+    }
+
+    // scene-1 explicit effect-gap bracket between the two dot bands (fades out as dots align)
+    if(align<0.99){
+      ctx.globalAlpha=1-align;
+      const yG1=H*0.42, yG0=H*0.60, xBr=W*0.585;
+      ctx.fillStyle=MUTED;ctx.font="10px 'IBM Plex Mono',monospace";ctx.textAlign='left';
+      ctx.fillText('EFFECT GAP',xBr-2,yG1-H*0.10);
+      ctx.font="11px 'IBM Plex Mono',monospace";
+      ctx.fillStyle=RED;ctx.fillText('G = 1',W*0.925,yG1+4);
+      ctx.fillStyle=INK;ctx.fillText('G = 0',W*0.925,yG0+4);
+      ctx.strokeStyle='rgba(29,36,51,0.45)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(xBr+10,yG1);ctx.lineTo(xBr,yG1);ctx.lineTo(xBr,yG0);ctx.lineTo(xBr+10,yG0);ctx.stroke();
+      ctx.fillStyle=INK;ctx.font="16px 'IBM Plex Mono',monospace";ctx.textAlign='right';
+      ctx.fillText('Δ '+(WSGA.effectGap(te)*100).toFixed(0)+'pp',xBr-8,(yG1+yG0)/2+5);
+      ctx.textAlign='left';ctx.globalAlpha=1;
+    }
 
     // scene-05 hidden-dimension cue
     if(hidden>0.01){
