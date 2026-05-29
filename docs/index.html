@@ -301,12 +301,21 @@ const WSGA = (function(){
       hidden:seg(top(4)-vh*0.6, top(4))          // scene 5 cue
     };
   }
+  // release the pinned canvas at the end: once the footer enters the viewport, translate
+  // the figure up by the same amount so it rides just above the footer and scrolls away
+  // cleanly (instead of the footer covering it).
+  const footerEl=document.querySelector('footer.site');
+  function parkCanvas(){
+    const y=window.scrollY||window.pageYOffset||0;
+    const over=Math.max(0, y+window.innerHeight-footerEl.offsetTop);
+    cv.style.transform = over>0 ? 'translateY('+(-over)+'px)' : '';
+  }
   let ticking=false;
-  function frame(){window.__p=progress();drawHero(window.__p);ticking=false;}
+  function frame(){window.__p=progress();drawHero(window.__p);parkCanvas();ticking=false;}
   function onScroll(){if(ticking)return;ticking=true;requestAnimationFrame(frame);}
-  addEventListener('resize',()=>{resize();drawHero(window.__p||{align:0,t:0,hidden:0});});
-  if(REDUCE){ resize();window.__p={align:1,t:1,hidden:0};drawHero(window.__p); }
-  else { addEventListener('scroll',onScroll,{passive:true});resize();window.__p=progress();drawHero(window.__p); }
+  addEventListener('resize',()=>{resize();drawHero(window.__p||{align:0,t:0,hidden:0});parkCanvas();});
+  if(REDUCE){ resize();window.__p={align:1,t:1,hidden:0};drawHero(window.__p);parkCanvas();addEventListener('scroll',()=>requestAnimationFrame(parkCanvas),{passive:true}); }
+  else { addEventListener('scroll',onScroll,{passive:true});resize();window.__p=progress();drawHero(window.__p);parkCanvas(); }
 })();
 </script>
 <script>
