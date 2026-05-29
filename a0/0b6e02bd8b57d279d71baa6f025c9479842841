@@ -1,0 +1,21 @@
+docs/index.html
+  s_c16d216d792e7b::t_0c38b2a4777e2a 95
+  s_c16d216d792e7b::t_1524a6ec542c37 105
+  s_c16d216d792e7b::t_442f686653c369 170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a00b6e02bd8b57d279d71baa6f025c9479842841",
+  "prompts": {},
+  "sessions": {
+    "s_c16d216d792e7b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "28a8e11f-6591-4e8a-ab2e-49a58cd66f83",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
