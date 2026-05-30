@@ -191,8 +191,10 @@ const WSGA = (function(){
   function lerp(a,b,u){return a+(b-a)*u;}
 
   window.drawHero=function(p){
-    p=p||{}; const align=clamp(p.align||0), te=ease(clamp(p.t||0)), hidden=clamp(p.hidden||0);
+    p=p||{}; const align=clamp(p.align||0), te=ease(clamp(p.t||0)), hidden=clamp(p.hidden||0), dock=ease(clamp(p.dock||0));
     ctx.clearRect(0,0,W,H);
+    ctx.save();
+    ctx.translate(0, -dock*H*0.30);   // dock the figure flush near the top during scene 5
     const baseY=(W<=760?H*0.78:H*0.70), amp=H*0.18;
 
     // curves (fade in with align; reweight with te)
@@ -287,6 +289,7 @@ const WSGA = (function(){
       for(let i=0;i<24;i++){const gx=X(0.05+0.9*((i*0.137)%1));ctx.beginPath();ctx.arc(gx,baseY+130,2.5,0,7);ctx.fill();}
       ctx.globalAlpha=1;
     }
+    ctx.restore();
   };
 
   // ---- phased scroll timeline ----
@@ -298,24 +301,16 @@ const WSGA = (function(){
     return {
       align: seg(top(0),top(1)),                 // phase A: scene 1 -> 2
       t:     seg(top(1),top(3)),                 // phase B: scene 2 -> 4 (=1 from scene 4 on)
-      hidden:seg(top(4)-vh*0.6, top(4))          // scene 5 cue
+      hidden:seg(top(4)-vh*0.6, top(4)),         // scene 5 cue
+      dock:  seg(top(3),top(4))                  // scene 4 -> 5: figure rises to dock at top
     };
   }
-  // release the pinned canvas at the end: once the footer enters the viewport, translate
-  // the figure up by the same amount so it rides just above the footer and scrolls away
-  // cleanly (instead of the footer covering it).
-  const footerEl=document.querySelector('footer.site');
-  function parkCanvas(){
-    const y=window.scrollY||window.pageYOffset||0;
-    const over=Math.max(0, y+window.innerHeight-footerEl.offsetTop);
-    cv.style.transform = over>0 ? 'translateY('+(-over)+'px)' : '';
-  }
   let ticking=false;
-  function frame(){window.__p=progress();drawHero(window.__p);parkCanvas();ticking=false;}
+  function frame(){window.__p=progress();drawHero(window.__p);ticking=false;}
   function onScroll(){if(ticking)return;ticking=true;requestAnimationFrame(frame);}
-  addEventListener('resize',()=>{resize();drawHero(window.__p||{align:0,t:0,hidden:0});parkCanvas();});
-  if(REDUCE){ resize();window.__p={align:1,t:1,hidden:0};drawHero(window.__p);parkCanvas();addEventListener('scroll',()=>requestAnimationFrame(parkCanvas),{passive:true}); }
-  else { addEventListener('scroll',onScroll,{passive:true});resize();window.__p=progress();drawHero(window.__p);parkCanvas(); }
+  addEventListener('resize',()=>{resize();drawHero(window.__p||{align:0,t:0,hidden:0});});
+  if(REDUCE){ resize();window.__p={align:1,t:1,hidden:0};drawHero(window.__p); }
+  else { addEventListener('scroll',onScroll,{passive:true});resize();window.__p=progress();drawHero(window.__p); }
 })();
 </script>
 <script>
