@@ -1,0 +1,32 @@
+docs/index.html
+  s_90d4d6bd617e6f::t_c00ce6697fa373 77-82
+  s_90d4d6bd617e6f::t_30df28ed844b41 250-255
+  s_90d4d6bd617e6f::t_3759084b3c7afc 283-284,286-289
+  s_90d4d6bd617e6f::t_fd8b09f8adf81a 329-336,338
+  s_90d4d6bd617e6f::t_bbf7af06371dbf 267-269
+  s_90d4d6bd617e6f::t_b6792a615a2f10 135
+  s_90d4d6bd617e6f::t_54f2c35d414a99 55-60
+  s_90d4d6bd617e6f::t_e84c4de0ca2cab 264
+  s_90d4d6bd617e6f::t_a2c000cba1f1a8 305
+  s_90d4d6bd617e6f::t_00bc6b4366cce1 209,212-213
+  s_90d4d6bd617e6f::t_570a2144a5cd5f 49-53
+  s_90d4d6bd617e6f::t_f47141e7513276 306-308,310
+  s_90d4d6bd617e6f::t_ba837698ed6988 236-237
+  s_90d4d6bd617e6f::t_623c936d8d8761 348-349,352
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f523a5fb470b9522f9e90e83f96df3faf393f568",
+  "prompts": {},
+  "sessions": {
+    "s_90d4d6bd617e6f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2dfe43c7-f42d-409a-9ada-cfb793751168",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Alvaro Carril <alvarocarril@gmail.com>"
+    }
+  }
+}
