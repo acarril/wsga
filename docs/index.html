@@ -46,11 +46,19 @@
   footer.site .install{font-size:13px;color:var(--muted);line-height:1.9;white-space:pre-wrap;}
   footer.site .cite{margin-top:36px;font-size:13px;color:var(--muted);max-width:60ch;line-height:1.6;}
 
+  /* desktop base: stage is the full-viewport fixed canvas layer (as the old #hero was).
+     These MUST precede the @media block so the mobile rules override them. */
+  .stage{position:fixed;inset:0;z-index:-1;}
+  #hero{width:100%;height:100%;display:block;}
+  .mprog{display:none;}                              /* progress bar: mobile-only */
   @media(max-width:760px){
-    .scene{flex-direction:column;align-items:flex-start;gap:6vh;min-height:auto;padding:10vh 7vw;}
-    .scene .panel{width:100%;}
+    .stage{position:sticky;top:0;inset:auto;height:46vh;z-index:2;
+           background:var(--paper);border-bottom:1px solid var(--panel-border);}
+    .mprog{display:block;position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--panel-border);}
+    .mprog i{display:block;height:100%;width:0;background:var(--red);}
+    .scene{flex-direction:column;align-items:flex-start;gap:6vh;min-height:88vh;padding:10vh 7vw;}
+    .scene .panel{display:none;}   /* the invisible plotframe spacer is dead weight on mobile */
   }
-  #hero{position:fixed;inset:0;width:100vw;height:100vh;z-index:-1;display:block;}
   /* scene panels now host nothing visible; the fixed canvas shows through.
      Keep .plotframe as a sizing spacer but make it invisible. */
   .plotframe{border-color:transparent;background:transparent;}
@@ -60,12 +68,17 @@
 </style>
 </head>
 <body>
-<canvas id="hero" aria-label="Animation: two subgroups' moderator M is reweighted until balanced; the subgroup effect gap grows from 4 to 9 percentage points once M is held constant."></canvas>
 <header class="site">
   <div class="kicker">Weighted Subgroup Analysis</div>
   <h1>Two subgroups,<br>pulled into <em>balance</em>.</h1>
   <div class="authors">Carril · Cazor · Gerardino · Litschig · Pomeranz</div>
 </header>
+
+<div class="scrolly">
+  <div class="stage">
+    <canvas id="hero" aria-label="Animation: two subgroups' moderator M is reweighted until balanced; the subgroup effect gap grows from 4 to 9 percentage points once M is held constant."></canvas>
+    <div class="mprog" aria-hidden="true"><i></i></div>
+  </div>
 
 <main id="track">
 
@@ -119,6 +132,7 @@
   </section>
 
 </main>
+</div>
 
 <footer class="site">
   <h2>Try it!</h2>
@@ -192,10 +206,11 @@ const WSGA = (function(){
 
   window.drawHero=function(p){
     p=p||{}; const align=clamp(p.align||0), te=ease(clamp(p.t||0)), hidden=clamp(p.hidden||0), dock=ease(clamp(p.dock||0));
+    const MOB=W<=760;
     ctx.clearRect(0,0,W,H);
     ctx.save();
-    ctx.translate(0, -dock*H*0.30);   // dock the figure flush near the top during scene 5
-    const baseY=(W<=760?H*0.78:H*0.70), amp=H*0.18;
+    ctx.translate(0, MOB?0:-dock*H*0.30);   // desktop docks the figure up for scene 5; mobile is already top-pinned
+    const baseY=(MOB?H*0.66:H*0.70), amp=(MOB?H*0.34:H*0.18);
 
     // curves (fade in with align; reweight with te)
     const d0=WSGA.kde(WSGA.G0,te,xs,0.05), d1=WSGA.kde(WSGA.G1,te,xs,0.05);
@@ -218,7 +233,8 @@ const WSGA = (function(){
     // dots: 2D cloud (align=0) -> M-axis lane (align=1); radius by weight (te), exaggerated
     const dots=(arr,color,grp)=>{
       for(const p2 of arr){
-        const x=lerp(p2.cxn*W,X(p2.m),align), y=lerp(p2.cyn*H,baseY+10+(grp?24:0),align);
+        const cloudXn=MOB?(0.34+((p2.cxn-0.61)/0.30)*0.59):p2.cxn;   // remap desktop right-cloud to a centered-right span on mobile
+        const x=lerp(cloudXn*W,X(p2.m),align), y=lerp(p2.cyn*H,baseY+10+(grp?24:0),align);
         const wv=WSGA.w(p2,te); const r=2.2+Math.pow(Math.max(0.05,wv),0.9)*2.7;
         ctx.globalAlpha=0.5;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=color;ctx.fill();ctx.globalAlpha=1;
       }
@@ -231,12 +247,12 @@ const WSGA = (function(){
       const tick=(arr,color)=>{let mu=WSGA.wmean(arr,te);ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(X(mu),baseY-amp-6);ctx.lineTo(X(mu),baseY+6);ctx.strokeStyle=color;ctx.lineWidth=1;ctx.stroke();ctx.setLineDash([]);};
       tick(WSGA.G0,INK);tick(WSGA.G1,RED);
       ctx.beginPath();ctx.moveTo(X(0),baseY);ctx.lineTo(X(1),baseY);ctx.strokeStyle='rgba(29,36,51,0.25)';ctx.lineWidth=1;ctx.stroke();
-      ctx.fillStyle=MUTED;ctx.font="11px 'IBM Plex Mono',monospace";ctx.textAlign='left';
-      ctx.fillText('STD. DIFF IN M',X(0),baseY+58);
-      ctx.fillStyle=INK;ctx.font="24px 'IBM Plex Mono',monospace";
-      ctx.fillText(WSGA.stdDiff(te).toFixed(2),X(0),baseY+84);
-      ctx.fillStyle=MUTED;ctx.font="11px 'IBM Plex Mono',monospace";ctx.textAlign='right';
-      ctx.fillText('M →',X(1),baseY+22);ctx.textAlign='left';
+      ctx.fillStyle=MUTED;ctx.font=(MOB?"9px":"11px")+" 'IBM Plex Mono',monospace";ctx.textAlign='left';
+      ctx.fillText('STD. DIFF IN M',X(0),MOB?H*0.86:baseY+58);
+      ctx.fillStyle=INK;ctx.font=(MOB?"16px":"24px")+" 'IBM Plex Mono',monospace";
+      ctx.fillText(WSGA.stdDiff(te).toFixed(2),X(0),MOB?H*0.98:baseY+84);
+      ctx.fillStyle=MUTED;ctx.font=(MOB?"9px":"11px")+" 'IBM Plex Mono',monospace";ctx.textAlign='right';
+      ctx.fillText('M →',X(1),MOB?baseY+16:baseY+22);ctx.textAlign='left';
       ctx.globalAlpha=1;
     }
 
@@ -245,10 +261,12 @@ const WSGA = (function(){
     // value labels, sub-label) fades in; the scene-1 G-band labels fade out.
     {
       const tau0=WSGA.tauMean(WSGA.G0,0,te), tau1=WSGA.tauMean(WSGA.G1,1,te), gap=WSGA.effectGap(te);
-      const eTop=H*0.36, eBot=H*0.50, eX=X(0), eMark=X(0)+16;
+      const eTop=(MOB?H*0.12:H*0.36), eBot=(MOB?H*0.40:H*0.50), eX=X(0), eMark=X(0)+(MOB?12:16);
       const yOf=(tau)=>eBot-(Math.max(0,Math.min(0.14,tau))/0.14)*(eBot-eTop);
       // scene-1 anchor: bracket spans the two dot-band centers; scene-2 anchor: panel markers
-      const xB=lerp(W*0.585,eMark,align), yTop=lerp(H*0.42,yOf(tau1),align), yBot=lerp(H*0.60,yOf(tau0),align);
+      const xB=lerp(MOB?W*0.20:W*0.585, eMark, align),
+            yTop=lerp(H*0.42, yOf(tau1), align),
+            yBot=lerp(H*0.60, yOf(tau0), align);
 
       // the morphing bracket + Delta label (always present)
       ctx.strokeStyle='rgba(29,36,51,0.45)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(xB+10,yTop);ctx.lineTo(xB,yTop);ctx.lineTo(xB,yBot);ctx.lineTo(xB+10,yBot);ctx.stroke();
@@ -262,11 +280,13 @@ const WSGA = (function(){
       // tau markers + value labels + sub-label (panel chrome) fade in
       if(align>0.01){
         ctx.globalAlpha=align;
-        const marker=(tau,color,lab)=>{const y=yOf(tau);ctx.fillStyle=color;ctx.beginPath();ctx.arc(eMark,y,5,0,7);ctx.fill();
-          ctx.font="10px 'IBM Plex Mono',monospace";ctx.textAlign='left';ctx.fillStyle=color;ctx.fillText(lab+' '+(tau*100).toFixed(1)+'pp',eMark+12,y+3);};
+        const marker=(tau,color,lab)=>{const y=yOf(tau);ctx.fillStyle=color;ctx.beginPath();ctx.arc(eMark,y,MOB?4:5,0,7);ctx.fill();
+          if(!MOB){ctx.font="10px 'IBM Plex Mono',monospace";ctx.textAlign='left';ctx.fillStyle=color;ctx.fillText(lab+' '+(tau*100).toFixed(1)+'pp',eMark+12,y+3);}};
         marker(tau0,INK,'τ(G0)');marker(tau1,RED,'τ(G1)');
-        ctx.fillStyle=MUTED;ctx.font="10px 'IBM Plex Mono',monospace";ctx.textAlign='left';
-        ctx.fillText(te<0.05?'but is the gap G, or M?':te<0.95?'holding M constant…':'holding M constant',eX,eBot+18);
+        if(!MOB){
+          ctx.fillStyle=MUTED;ctx.font="10px 'IBM Plex Mono',monospace";ctx.textAlign='left';
+          ctx.fillText(te<0.05?'but is the gap G, or M?':te<0.95?'holding M constant…':'holding M constant',eX,eBot+18);
+        }
         ctx.globalAlpha=1;
       }
 
@@ -282,11 +302,12 @@ const WSGA = (function(){
     // scene-05 hidden-dimension cue
     if(hidden>0.01){
       ctx.globalAlpha=0.6*hidden;
-      ctx.fillStyle=MUTED;ctx.font="11px 'IBM Plex Mono',monospace";ctx.textAlign='left';
-      ctx.fillText('unobserved U — weighting can’t see this',X(0),baseY+114);
-      ctx.strokeStyle='rgba(115,118,126,0.4)';ctx.setLineDash([2,4]);ctx.beginPath();ctx.moveTo(X(0),baseY+130);ctx.lineTo(X(1),baseY+130);ctx.stroke();ctx.setLineDash([]);
+      const uy=MOB?H*0.79:baseY+114, ly=MOB?H*0.82:baseY+130;
+      ctx.fillStyle=MUTED;ctx.font=(MOB?"9px":"11px")+" 'IBM Plex Mono',monospace";ctx.textAlign='left';
+      ctx.fillText(MOB?'unobserved U — unseen':'unobserved U — weighting can’t see this',X(0),uy);
+      ctx.strokeStyle='rgba(115,118,126,0.4)';ctx.setLineDash([2,4]);ctx.beginPath();ctx.moveTo(X(0),ly);ctx.lineTo(X(1),ly);ctx.stroke();ctx.setLineDash([]);
       ctx.fillStyle='rgba(115,118,126,0.55)';
-      for(let i=0;i<24;i++){const gx=X(0.05+0.9*((i*0.137)%1));ctx.beginPath();ctx.arc(gx,baseY+130,2.5,0,7);ctx.fill();}
+      for(let i=0;i<24;i++){const gx=X(0.05+0.9*((i*0.137)%1));ctx.beginPath();ctx.arc(gx,ly,2.5,0,7);ctx.fill();}
       ctx.globalAlpha=1;
     }
     ctx.restore();
@@ -305,8 +326,16 @@ const WSGA = (function(){
       dock:  seg(top(3),top(4))                  // scene 4 -> 5: figure rises to dock at top
     };
   }
+  const mprogI=document.querySelector('.mprog i');
+  function updateProgress(){
+    if(!mprogI)return;
+    const sc=document.querySelector('.scrolly'); if(!sc)return;
+    const top=sc.offsetTop, h=sc.offsetHeight, vh=window.innerHeight;
+    const f=clamp(((window.scrollY||window.pageYOffset||0)-top)/Math.max(1,h-vh));
+    mprogI.style.width=(f*100)+'%';
+  }
   let ticking=false;
-  function frame(){window.__p=progress();drawHero(window.__p);ticking=false;}
+  function frame(){window.__p=progress();drawHero(window.__p);updateProgress();ticking=false;}
   function onScroll(){if(ticking)return;ticking=true;requestAnimationFrame(frame);}
   addEventListener('resize',()=>{resize();drawHero(window.__p||{align:0,t:0,hidden:0});});
   if(REDUCE){ resize();window.__p={align:1,t:1,hidden:0};drawHero(window.__p); }
@@ -316,9 +345,11 @@ const WSGA = (function(){
 <script>
 (function(){
   const texts=document.querySelectorAll('.scene .text');
+  const mob=window.matchMedia&&window.matchMedia('(max-width:760px)').matches;
+  const rm=mob?'-52% 0px -12% 0px':'-35% 0px -35% 0px';   // mobile: activate text in the lower band, below the 46vh figure
   const io=new IntersectionObserver((entries)=>{
     entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('active'); });
-  },{rootMargin:'-35% 0px -35% 0px',threshold:0});
+  },{rootMargin:rm,threshold:0});
   texts.forEach(t=>io.observe(t));
 })();
 </script>
